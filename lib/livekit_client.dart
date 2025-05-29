@@ -61,3 +61,5 @@ export 'src/widgets/video_track_renderer.dart';
 export 'src/data_stream/stream_reader.dart';
 export 'src/data_stream/stream_writer.dart';
 export 'src/types/data_stream.dart';
+
+export 'package:flutter_webrtc/flutter_webrtc.dart' show EffectsSdkImage;

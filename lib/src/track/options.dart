@@ -63,11 +63,13 @@ class CameraCaptureOptions extends VideoCaptureOptions {
     String? deviceId,
     double? maxFrameRate,
     VideoParameters params = VideoParametersPresets.h720_169,
+    bool? effectsSdkRequired,
     this.stopCameraCaptureOnMute = true,
     TrackProcessor<VideoProcessorOptions>? processor,
   }) : super(
           params: params,
           deviceId: deviceId,
+          effectsSdkRequired: effectsSdkRequired,
           maxFrameRate: maxFrameRate,
           processor: processor,
         );
@@ -80,6 +82,7 @@ class CameraCaptureOptions extends VideoCaptureOptions {
         super(
           params: captureOptions.params,
           deviceId: captureOptions.deviceId,
+          effectsSdkRequired: captureOptions.effectsSdkRequired,
           maxFrameRate: captureOptions.maxFrameRate,
         );
 
@@ -91,6 +94,7 @@ class CameraCaptureOptions extends VideoCaptureOptions {
         'facingMode':
             cameraPosition == CameraPosition.front ? 'user' : 'environment'
     };
+    constraints['effectsSdkRequired'] = effectsSdkRequired;
     if (deviceId != null && deviceId!.isNotEmpty) {
       if (kIsWeb) {
         if (isChrome129OrLater()) {
@@ -223,6 +227,7 @@ abstract class VideoCaptureOptions extends LocalTrackOptions {
   /// List<DesktopCapturerSource> desktopSources = await rtc.desktopCapturer.getSources(types: [rtc.SourceType.Screen, rtc.SourceType.Window]);
   /// </pre>
   final String? deviceId;
+  final bool? effectsSdkRequired;
 
   // Limit the maximum frameRate of the capture device.
   final double? maxFrameRate;
@@ -233,6 +238,7 @@ abstract class VideoCaptureOptions extends LocalTrackOptions {
   const VideoCaptureOptions({
     this.params = VideoParametersPresets.h540_169,
     this.deviceId,
+    this.effectsSdkRequired,
     this.maxFrameRate,
     this.processor,
   });

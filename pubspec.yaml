@@ -37,7 +37,9 @@ dependencies:
   uuid: ^4.5.1
   synchronized: ^3.0.0+3
   protobuf: ">=3.0.0"
-  flutter_webrtc: ^0.14.1
+  flutter_webrtc:
+    git:
+      url: https://github.com/EffectsSDK/flutter-webrtc.git
   device_info_plus: ^11.3.0
   dart_webrtc: ^1.5.3
   sdp_transform: ^0.3.2

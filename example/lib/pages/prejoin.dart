@@ -50,6 +50,11 @@ class _PreJoinPageState extends State<PreJoinPage> {
 
   bool _busy = false;
   bool _enableVideo = true;
+  bool paused = false;
+  bool _remove = false;
+  bool _blur = true;
+  bool _colorCorrection = false;
+  bool _smartZoom = false;
   bool _enableAudio = true;
   LocalAudioTrack? _audioTrack;
   LocalVideoTrack? _videoTrack;
@@ -109,6 +114,62 @@ class _PreJoinPageState extends State<PreJoinPage> {
     setState(() {});
   }
 
+  Future<void> _pauseVideoTrack(value) async {
+    paused = value;
+    if (paused) {
+      await _videoTrack?.disable();
+    } else {
+      await _videoTrack?.enable();
+    }
+    setState(() {});
+  }
+
+  Future<void> _setReplaceModeSdk(value) async {
+    _remove = value;
+    if (_remove) {
+      _blur = false;
+      _videoTrack!.setPipelineMode(PipelineMode.replace);
+      _videoTrack!.setBackgroundImage(EffectsSdkImage.fromRGB(r: 1, g: 0.1, b: 0.7));
+    } else {
+      _videoTrack!.setPipelineMode(PipelineMode.noEffects);
+    }
+    setState(() {});
+  }
+
+  Future<void> _setBlurModeSdk(value) async {
+    _blur = value;
+    if (_blur) {
+      _remove = false;
+      _videoTrack!.setPipelineMode(PipelineMode.blur);
+      _videoTrack!.setBlurPower(0.7);
+    } else {
+      _videoTrack!.setPipelineMode(PipelineMode.noEffects);
+    }
+    setState(() {});
+  }
+
+  Future<void> _setColorCorrectionSdk(value) async {
+    _colorCorrection = value;
+    if (_colorCorrection){
+      _videoTrack!.setColorCorrectionMode(ColorCorrectionMode.colorCorrectionMode);
+      _videoTrack!.setColorFilterStrength(0.5);
+    } else {
+      _videoTrack!.setColorCorrectionMode(ColorCorrectionMode.noFilterMode);
+      _videoTrack!.setColorFilterStrength(0.0);
+    }
+    setState(() {});
+  }
+
+  Future<void> _setSmartZoomSdk(value) async {
+    _smartZoom = value;
+    if (_smartZoom) {
+      _videoTrack!.setZoomLevel(0.5);
+    } else {
+      _videoTrack!.setZoomLevel(0);
+    }
+    setState(() {});
+  }
+
   Future<void> _setEnableAudio(value) async {
     _enableAudio = value;
     if (!_enableAudio) {
@@ -143,12 +204,31 @@ class _PreJoinPageState extends State<PreJoinPage> {
     }
 
     if (_selectedVideoDevice != null) {
-      _videoTrack =
-          await LocalVideoTrack.createCameraTrack(CameraCaptureOptions(
+      _videoTrack = await LocalVideoTrack.createCameraTrack(CameraCaptureOptions(
         deviceId: _selectedVideoDevice!.deviceId,
         params: _selectedVideoParameters,
+        // set effects SDK parameter to true
+        effectsSdkRequired: true,
       ));
       await _videoTrack!.start();
+      // initialize Effects SDK
+      AuthStatus status = await _videoTrack!.auth('YOUR_CUSTOMER_KEY');
+      switch (status){
+        case AuthStatus.active:
+          //Set pipeline options
+          _videoTrack!.setPipelineMode(PipelineMode.blur);
+          _videoTrack!.setBlurPower(0.75);
+          break;
+        case AuthStatus.expired:
+          // TODO: Handle this case as you need.
+          break;
+        case AuthStatus.inactive:
+          // TODO: Handle this case as you need.
+          break;
+        case AuthStatus.unavailable:
+          // TODO: Handle this case as you need.
+          break;
+      }
     }
   }
 
@@ -314,6 +394,71 @@ class _PreJoinPageState extends State<PreJoinPage> {
                           Switch(
                             value: _enableVideo,
                             onChanged: (value) => _setEnableVideo(value),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 5),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Pause video:'),
+                          Switch(
+                            value: paused,
+                            onChanged: (value) => _pauseVideoTrack(value),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 5),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Remove:'),
+                          Switch(
+                            value: _remove,
+                            onChanged: (value) => _setReplaceModeSdk(value),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 5),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Blur:'),
+                          Switch(
+                            value: _blur,
+                            onChanged: (value) => _setBlurModeSdk(value),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 5),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('SmartZoom:'),
+                          Switch(
+                            value: _smartZoom,
+                            onChanged: (value) => _setSmartZoomSdk(value),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 5),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('ColorCorrection:'),
+                          Switch(
+                            value: _colorCorrection,
+                            onChanged: (value) => _setColorCorrectionSdk(value),
                           ),
                         ],
                       ),

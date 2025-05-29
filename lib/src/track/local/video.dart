@@ -254,6 +254,80 @@ class LocalVideoTrack extends LocalTrack with VideoTrack {
 // Convenience extensions
 //
 extension LocalVideoTrackExt on LocalVideoTrack {
+  /**
+      Effects SDK get\set extension. Use it to control effects SDK options
+   */
+  Future<rtc.AuthStatus> auth(String customerID, {String? apiUrl}) async {
+    return rtc.Helper.auth(mediaStreamTrack, customerID, apiUrl:apiUrl);
+  }
+
+  Future<rtc.AuthStatus> localAuth(String localKey) async {
+    return rtc.Helper.localAuth(mediaStreamTrack, localKey);;
+  }
+
+  Future<rtc.PipelineMode> getPipelineMode() async {
+    return rtc.Helper.getEffectsSdkPipelineMode(mediaStreamTrack);
+  }
+
+  void setPipelineMode(rtc.PipelineMode mode) {
+    rtc.Helper.setEffectsSdkPipelineMode(mediaStreamTrack, mode);
+  }
+
+  void setBlurPower(double blurPower) {
+    rtc.Helper.setEffectsSdkBlurPower(mediaStreamTrack, blurPower);
+  }
+
+  void setBackgroundImage(rtc.EffectsSdkImage image) {
+    rtc.Helper.setEffectsSdkBackgroundImage(mediaStreamTrack, image);
+  }
+
+  void enableBeautification(bool enable) {
+    rtc.Helper.enableEffectsSdkBeautification(mediaStreamTrack, enable);
+  }
+
+  Future<bool> isBeautificationEnabled() async {
+    return rtc.Helper.isEffectsSdkBeautificationEnabled(mediaStreamTrack);
+  }
+
+  void setBeautificationPower(double power) {
+    rtc.Helper.setEffectsSdkBeautificationPower(mediaStreamTrack, power);
+  }
+
+  Future<double> getZoomLevel() async {
+    return rtc.Helper.getEffectsSdkZoomLevel(mediaStreamTrack);
+  }
+
+  void setZoomLevel(double zoomLevel) {
+    rtc.Helper.setEffectsSdkZoomLevel(mediaStreamTrack, zoomLevel);
+  }
+
+  void enableSharpening(bool enable) {
+    rtc.Helper.enableEffectsSdkSharpening(mediaStreamTrack, enable);
+  }
+
+  Future<double> getSharpeningStrength() async {
+    return rtc.Helper.getEffectsSdkSharpeningStrength(mediaStreamTrack);
+  }
+
+  void setSharpeningStrength(double strength) {
+    rtc.Helper.setEffectsSdkSharpeningStrength(mediaStreamTrack, strength);
+  }
+
+  void setColorCorrectionMode(rtc.ColorCorrectionMode colorCorrectionMode) {
+    rtc.Helper.setEffectsSdkColorCorrectionMode(
+        mediaStreamTrack,
+        colorCorrectionMode
+    );
+  }
+
+  void setColorFilterStrength(double strength) {
+    rtc.Helper.setEffectsSdkColorFilterStrength(mediaStreamTrack, strength);
+  }
+
+  void setColorGradingReferenceImage(rtc.EffectsSdkImage reference) {
+    rtc.Helper.setEffectsSdkColorGradingReferenceImage(mediaStreamTrack, reference);
+  }
+
   // Calls restartTrack under the hood
   Future<void> setCameraPosition(CameraPosition position) async {
     final options = currentOptions;
