@@ -128,10 +128,10 @@ class _PreJoinPageState extends State<PreJoinPage> {
     _remove = value;
     if (_remove) {
       _blur = false;
-      _videoTrack!.setPipelineMode(PipelineMode.replace);
-      _videoTrack!.setBackgroundImage(EffectsSdkImage.fromRGB(r: 1, g: 0.1, b: 0.7));
-    } else {
-      _videoTrack!.setPipelineMode(PipelineMode.noEffects);
+      await _videoTrack!.setPipelineMode(PipelineMode.replace);
+      await _videoTrack!.setBackgroundImage(EffectsSdkImage.fromRGB(r: 0, g: 0.8, b: 0));
+    } else if (PipelineMode.replace == await _videoTrack!.getPipelineMode()) {
+      await _videoTrack!.setPipelineMode(PipelineMode.noEffects);
     }
     setState(() {});
   }
@@ -140,10 +140,10 @@ class _PreJoinPageState extends State<PreJoinPage> {
     _blur = value;
     if (_blur) {
       _remove = false;
-      _videoTrack!.setPipelineMode(PipelineMode.blur);
-      _videoTrack!.setBlurPower(0.7);
-    } else {
-      _videoTrack!.setPipelineMode(PipelineMode.noEffects);
+      await _videoTrack!.setPipelineMode(PipelineMode.blur);
+      await _videoTrack!.setBlurPower(0.7);
+    } else if (PipelineMode.blur == await _videoTrack!.getPipelineMode()) {
+      await _videoTrack!.setPipelineMode(PipelineMode.noEffects);
     }
     setState(() {});
   }
@@ -151,11 +151,11 @@ class _PreJoinPageState extends State<PreJoinPage> {
   Future<void> _setColorCorrectionSdk(value) async {
     _colorCorrection = value;
     if (_colorCorrection){
-      _videoTrack!.setColorCorrectionMode(ColorCorrectionMode.colorCorrectionMode);
-      _videoTrack!.setColorFilterStrength(0.5);
+      await _videoTrack!.setColorCorrectionMode(ColorCorrectionMode.colorCorrectionMode);
+      await _videoTrack!.setColorFilterStrength(0.5);
     } else {
-      _videoTrack!.setColorCorrectionMode(ColorCorrectionMode.noFilterMode);
-      _videoTrack!.setColorFilterStrength(0.0);
+      await _videoTrack!.setColorCorrectionMode(ColorCorrectionMode.noFilterMode);
+      await _videoTrack!.setColorFilterStrength(0.0);
     }
     setState(() {});
   }
@@ -163,9 +163,9 @@ class _PreJoinPageState extends State<PreJoinPage> {
   Future<void> _setSmartZoomSdk(value) async {
     _smartZoom = value;
     if (_smartZoom) {
-      _videoTrack!.setZoomLevel(0.5);
+      await _videoTrack!.setZoomLevel(0.5);
     } else {
-      _videoTrack!.setZoomLevel(0);
+      await _videoTrack!.setZoomLevel(0);
     }
     setState(() {});
   }
@@ -215,20 +215,23 @@ class _PreJoinPageState extends State<PreJoinPage> {
       AuthStatus status = await _videoTrack!.auth('YOUR_CUSTOMER_KEY');
       switch (status){
         case AuthStatus.active:
-          //Set pipeline options
-          _videoTrack!.setPipelineMode(PipelineMode.blur);
-          _videoTrack!.setBlurPower(0.75);
           break;
         case AuthStatus.expired:
           // TODO: Handle this case as you need.
-          break;
+          return;
         case AuthStatus.inactive:
           // TODO: Handle this case as you need.
-          break;
+          return;
         case AuthStatus.unavailable:
           // TODO: Handle this case as you need.
-          break;
+          return;
       }
+
+      //Set pipeline options
+      await _setBlurModeSdk(_blur);
+      await _setReplaceModeSdk(_remove);
+      await _setColorCorrectionSdk(_colorCorrection);
+      await _setSmartZoomSdk(_smartZoom);
     }
   }
 

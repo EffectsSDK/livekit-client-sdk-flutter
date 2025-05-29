@@ -269,63 +269,63 @@ extension LocalVideoTrackExt on LocalVideoTrack {
     return rtc.Helper.getEffectsSdkPipelineMode(mediaStreamTrack);
   }
 
-  void setPipelineMode(rtc.PipelineMode mode) {
-    rtc.Helper.setEffectsSdkPipelineMode(mediaStreamTrack, mode);
+  Future<void> setPipelineMode(rtc.PipelineMode mode) {
+    return rtc.Helper.setEffectsSdkPipelineMode(mediaStreamTrack, mode);
   }
 
-  void setBlurPower(double blurPower) {
-    rtc.Helper.setEffectsSdkBlurPower(mediaStreamTrack, blurPower);
+  Future<void> setBlurPower(double blurPower) {
+    return rtc.Helper.setEffectsSdkBlurPower(mediaStreamTrack, blurPower);
   }
 
-  void setBackgroundImage(rtc.EffectsSdkImage image) {
-    rtc.Helper.setEffectsSdkBackgroundImage(mediaStreamTrack, image);
+  Future<void> setBackgroundImage(rtc.EffectsSdkImage image) {
+    return rtc.Helper.setEffectsSdkBackgroundImage(mediaStreamTrack, image);
   }
 
-  void enableBeautification(bool enable) {
-    rtc.Helper.enableEffectsSdkBeautification(mediaStreamTrack, enable);
+  Future<void> enableBeautification(bool enable) {
+    return rtc.Helper.enableEffectsSdkBeautification(mediaStreamTrack, enable);
   }
 
-  Future<bool> isBeautificationEnabled() async {
+  Future<bool> isBeautificationEnabled() {
     return rtc.Helper.isEffectsSdkBeautificationEnabled(mediaStreamTrack);
   }
 
-  void setBeautificationPower(double power) {
-    rtc.Helper.setEffectsSdkBeautificationPower(mediaStreamTrack, power);
+  Future<void> setBeautificationPower(double power) {
+    return rtc.Helper.setEffectsSdkBeautificationPower(mediaStreamTrack, power);
   }
 
-  Future<double> getZoomLevel() async {
+  Future<double> getZoomLevel() {
     return rtc.Helper.getEffectsSdkZoomLevel(mediaStreamTrack);
   }
 
-  void setZoomLevel(double zoomLevel) {
-    rtc.Helper.setEffectsSdkZoomLevel(mediaStreamTrack, zoomLevel);
+  Future<void> setZoomLevel(double zoomLevel) {
+    return rtc.Helper.setEffectsSdkZoomLevel(mediaStreamTrack, zoomLevel);
   }
 
-  void enableSharpening(bool enable) {
-    rtc.Helper.enableEffectsSdkSharpening(mediaStreamTrack, enable);
+  Future<void> enableSharpening(bool enable) {
+    return rtc.Helper.enableEffectsSdkSharpening(mediaStreamTrack, enable);
   }
 
-  Future<double> getSharpeningStrength() async {
+  Future<double> getSharpeningStrength() {
     return rtc.Helper.getEffectsSdkSharpeningStrength(mediaStreamTrack);
   }
 
-  void setSharpeningStrength(double strength) {
-    rtc.Helper.setEffectsSdkSharpeningStrength(mediaStreamTrack, strength);
+  Future<void> setSharpeningStrength(double strength) {
+    return rtc.Helper.setEffectsSdkSharpeningStrength(mediaStreamTrack, strength);
   }
 
-  void setColorCorrectionMode(rtc.ColorCorrectionMode colorCorrectionMode) {
-    rtc.Helper.setEffectsSdkColorCorrectionMode(
+  Future<void> setColorCorrectionMode(rtc.ColorCorrectionMode colorCorrectionMode) {
+    return rtc.Helper.setEffectsSdkColorCorrectionMode(
         mediaStreamTrack,
         colorCorrectionMode
     );
   }
 
-  void setColorFilterStrength(double strength) {
-    rtc.Helper.setEffectsSdkColorFilterStrength(mediaStreamTrack, strength);
+  Future<void> setColorFilterStrength(double strength) {
+    return rtc.Helper.setEffectsSdkColorFilterStrength(mediaStreamTrack, strength);
   }
 
-  void setColorGradingReferenceImage(rtc.EffectsSdkImage reference) {
-    rtc.Helper.setEffectsSdkColorGradingReferenceImage(mediaStreamTrack, reference);
+  Future<void> setColorGradingReferenceImage(rtc.EffectsSdkImage reference) {
+    return rtc.Helper.setEffectsSdkColorGradingReferenceImage(mediaStreamTrack, reference);
   }
 
   // Calls restartTrack under the hood
