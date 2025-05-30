@@ -216,15 +216,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  flutter_webrtc:
-    dependency: "direct main"
-    description:
-      path: "."
-      ref: HEAD
-      resolved-ref: "62ceb720dc80774c4740e30319c140fca9aa3fe8"
-      url: "https://github.com/EffectsSDK/flutter-webrtc.git"
-    source: git
-    version: "0.14.1"
   glob:
     dependency: transitive
     description:
