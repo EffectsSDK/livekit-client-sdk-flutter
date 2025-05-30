@@ -39,8 +39,8 @@ await _videoTrack!.start();
 AuthStatus status = await _videoTrack!.auth('YOUR_CUSTOMER_KEY');
 switch (status){
     case AuthStatus.active:
-      _videoTrack!.setPipelineMode(PipelineMode.blur);
-      _videoTrack!.setBlurPower(0.99);
+      await _videoTrack!.setPipelineMode(PipelineMode.blur);
+      await _videoTrack!.setBlurPower(0.6);
       break;
     case AuthStatus.expired:
       // TODO: Handle this case.
@@ -57,22 +57,13 @@ switch (status){
 
 You can manage all sdk parameters without VideoTrack recreation.
 
-## EffectsSDK methods
+## EffectsSDK Documentation
+
+[Video Effects SDK Extension API Reference](https://effectssdk.ai/sdk/livekit-flutter/livekit_client/VideoEffectsSDKExt.html)  
 
 Check platform specifications:
 1. [iOS](https://github.com/EffectsSDK/swift-video-effects-sdk)
 2. [android](https://github.com/EffectsSDK/android-integration-sample)
-
-### Effects SDK Image
-
-class EffectsSdkImage
-
-Can be created from:
-
-1. raw data
-2. file
-3. encoded data
-4. rgb color
 
 ## Technical details
 
@@ -85,4 +76,5 @@ Also you can replace CameraPipeline to lite version of it.
 
 1. Platform documentation ([iOS](https://effectssdk.ai/sdk/ios/documentation/tsvb), [android](https://github.com/EffectsSDK/android-integration-sample))
 2. Effects SDK [site](https://effectssdk.ai/)
+3. Original livekit API documentation [site](https://docs.livekit.io/reference/client-sdk-flutter/)
 
