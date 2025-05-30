@@ -37,6 +37,7 @@ export 'src/publication/remote.dart';
 export 'src/publication/track_publication.dart';
 export 'src/support/platform.dart';
 export 'src/track/local/audio.dart';
+export 'src/track/local/effects_sdk.dart';
 export 'src/track/local/local.dart';
 export 'src/track/local/video.dart';
 export 'src/track/options.dart';
