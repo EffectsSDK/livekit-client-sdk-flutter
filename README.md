@@ -36,7 +36,7 @@ _videoTrack = await LocalVideoTrack.createCameraTrack(
 );
 await _videoTrack!.start();
 // You can call auth at any time after start.
-AuthStatus status = await _videoTrack!.auth('YOUR_CUSTOMER_KEY');
+AuthStatus status = await _videoTrack!.auth('YOUR_CUSTOMER_ID');
 switch (status){
     case AuthStatus.active:
       await _videoTrack!.setPipelineMode(PipelineMode.blur);
@@ -56,6 +56,12 @@ switch (status){
 ```
 
 You can manage all sdk parameters without VideoTrack recreation.
+
+## Trial Evaluation
+
+A Customer ID is required for the Effects SDK.
+
+To receive a new trial Customer ID, please fill out the contact form on the [effectssdk.ai](https://effectssdk.ai/request-trial) website.
 
 ## EffectsSDK Documentation
 
