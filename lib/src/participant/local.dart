@@ -18,7 +18,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' hide internal;
 
 import 'package:async/async.dart';
 import 'package:fixnum/fixnum.dart';
@@ -618,7 +618,7 @@ class LocalParticipant extends Participant<LocalTrackPublication> {
   void setAttributes(Map<String, String> attributes) {
     room.engine.signalClient
         .sendUpdateLocalMetadata(lk_rtc.UpdateParticipantMetadata(
-      attributes: attributes,
+      attributes: attributes.entries,
     ));
   }
 

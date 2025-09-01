@@ -15,7 +15,7 @@
 import 'dart:async';
 import 'dart:collection';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' hide internal;
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:fixnum/fixnum.dart';
@@ -315,6 +315,7 @@ class SignalClient extends Disposable with EventsEmittable<SignalEvent> {
       case lk_rtc.SignalResponse_Message.subscribedQualityUpdate:
         events.emit(SignalSubscribedQualityUpdatedEvent(
           trackSid: msg.subscribedQualityUpdate.trackSid,
+          // ignore: deprecated_member_use_from_same_package
           subscribedQualities: msg.subscribedQualityUpdate.subscribedQualities,
           subscribedCodecs: msg.subscribedQualityUpdate.subscribedCodecs,
         ));

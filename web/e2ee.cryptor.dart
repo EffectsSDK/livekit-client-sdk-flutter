@@ -145,6 +145,7 @@ class FrameCryptor {
   KeyOptions get keyOptions => keyHandler.keyOptions;
   late String kind;
   bool _enabled = false;
+  bool _transformIsActive = false;
   CryptorError lastError = CryptorError.kNew;
   int currentKeyIndex = 0;
   final web.DedicatedWorkerGlobalScope worker;
@@ -239,6 +240,7 @@ class FrameCryptor {
     required web.WritableStream writable,
     required String trackId,
     required String kind,
+    required bool isReuse,
     String? codec,
   }) async {
     logger.info('setupTransform $operation kind $kind');
@@ -246,6 +248,10 @@ class FrameCryptor {
     if (codec != null) {
       logger.info('setting codec on cryptor to $codec');
       this.codec = codec;
+    }
+    if (isReuse && _transformIsActive) {
+      logger.info('setupTransform: transform already active, skipping setup');
+      return;
     }
     var transformer = web.TransformStream({
       'transform':
@@ -268,6 +274,7 @@ class FrameCryptor {
         });
       }
     }
+    _transformIsActive = true;
     this.trackId = trackId;
   }
 
@@ -384,7 +391,7 @@ class FrameCryptor {
 
       var srcFrame = readFrameInfo(frameObj);
 
-      logger.fine(
+      logger.finer(
           'encodeFunction: buffer ${srcFrame.buffer.length}, synchronizationSource ${srcFrame.ssrc} frameType ${srcFrame.frameType}');
 
       var secretKey = keyHandler.getKeySet(currentKeyIndex)?.encryptionKey;
@@ -479,7 +486,7 @@ class FrameCryptor {
     var srcFrame = readFrameInfo(frameObj);
     var ratchetCount = 0;
 
-    logger.fine('decodeFunction: frame lenght ${srcFrame.buffer.length}');
+    logger.finer('decodeFunction: frame length ${srcFrame.buffer.length}');
 
     ByteBuffer? decrypted;
     KeySet? initialKeySet;
@@ -490,9 +497,8 @@ class FrameCryptor {
         srcFrame.buffer.isEmpty) {
       sifGuard.recordUserFrame();
       if (keyOptions.discardFrameWhenCryptorNotReady) return;
-      logger.fine('enqueing empty frame');
+      logger.fine('enqueing empty dtx frame');
       controller.enqueue(frameObj);
-      logger.finer('enqueing silent frame');
       return;
     }
 
@@ -508,20 +514,18 @@ class FrameCryptor {
           if (sifGuard.isSifAllowed()) {
             var frameType =
                 srcFrame.buffer.sublist(srcFrame.buffer.length - 1)[0];
-            logger
-                .finer('ecodeFunction: skip uncrypted frame, type $frameType');
+            logger.finer(
+                'encodeFunction: skip unencrypted frame, type $frameType');
             var finalBuffer = BytesBuilder();
             finalBuffer.add(Uint8List.fromList(srcFrame.buffer
                 .sublist(0, srcFrame.buffer.length - (magicBytes.length + 1))));
+            logger.fine('encodeFunction: enqueing silent frame');
             enqueueFrame(frameObj, controller, finalBuffer);
-            logger.fine('ecodeFunction: enqueing silent frame');
-            controller.enqueue(frameObj);
+            return;
           } else {
-            logger.finer('ecodeFunction: SIF limit reached, dropping frame');
+            logger.fine('encodeFunction: SIF limit reached, dropping frame');
+            return;
           }
-          logger.finer('ecodeFunction: enqueing silent frame');
-          controller.enqueue(frameObj);
-          return;
         } else {
           sifGuard.recordUserFrame();
         }
@@ -678,7 +682,7 @@ class FrameCryptor {
         });
       }
 
-      logger.fine(
+      logger.finer(
           'decodeFunction[CryptorError.kOk]: decryption success kind $kind, headerLength: $headerLength, timestamp: ${srcFrame.timestamp}, ssrc: ${srcFrame.ssrc}, data length: ${srcFrame.buffer.length}, decrypted length: ${finalBuffer.toBytes().length}, keyindex $keyIndex iv $iv');
     } catch (e, s) {
       logger.info('decodeFunction[CryptorError.kDecryptError]: $e, $s');

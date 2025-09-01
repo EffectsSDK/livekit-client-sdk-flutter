@@ -42,22 +42,40 @@ enum VideoRenderMode {
   platformView,
 }
 
+enum VideoViewFit {
+  contain,
+  cover,
+}
+
+extension VideoViewFitExt on VideoViewFit {
+  rtc.RTCVideoViewObjectFit toRTCType() {
+    if (this == VideoViewFit.cover) {
+      return rtc.RTCVideoViewObjectFit.RTCVideoViewObjectFitCover;
+    }
+    return rtc.RTCVideoViewObjectFit.RTCVideoViewObjectFitContain;
+  }
+}
+
 /// Widget that renders a [VideoTrack].
 class VideoTrackRenderer extends StatefulWidget {
   final VideoTrack track;
-  final rtc.RTCVideoViewObjectFit fit;
+  final VideoViewFit fit;
   final VideoViewMirrorMode mirrorMode;
   final VideoRenderMode renderMode;
   final rtc.RTCVideoRenderer? cachedRenderer;
   final bool autoDisposeRenderer;
 
+  /// wrap the video view in a Center widget (if [fit] is [VideoViewFit.contain])
+  final bool autoCenter;
+
   const VideoTrackRenderer(
     this.track, {
-    this.fit = rtc.RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+    this.fit = VideoViewFit.contain,
     this.mirrorMode = VideoViewMirrorMode.auto,
     this.renderMode = VideoRenderMode.texture,
     this.autoDisposeRenderer = true,
     this.cachedRenderer,
+    this.autoCenter = true,
     Key? key,
   }) : super(key: key);
 
@@ -69,6 +87,7 @@ class _VideoTrackRendererState extends State<VideoTrackRenderer> {
   rtc.VideoRenderer? _renderer;
   // for flutter web only.
   bool _rendererReadyForWeb = false;
+  double? _aspectRatio;
   EventsListener<TrackEvent>? _listener;
   // Used to compute visibility information
   late GlobalKey _internalKey;
@@ -107,6 +126,7 @@ class _VideoTrackRendererState extends State<VideoTrackRenderer> {
 
   void disposeRenderer() {
     try {
+      _renderer?.onResize = null;
       _renderer?.srcObject = null;
       _renderer?.dispose();
       _renderer = null;
@@ -153,6 +173,14 @@ class _VideoTrackRendererState extends State<VideoTrackRenderer> {
         // force recompute of mirror mode
         setState(() {});
       });
+    _renderer?.onResize = () {
+      if (mounted) {
+        setState(() {
+          _aspectRatio =
+              (_renderer as rtc.RTCVideoRenderer?)?.videoValue.aspectRatio;
+        });
+      }
+    };
   }
 
   @override
@@ -186,7 +214,7 @@ class _VideoTrackRendererState extends State<VideoTrackRenderer> {
               _renderer! as rtc.RTCVideoRenderer,
               mirror: _shouldMirror(),
               filterQuality: FilterQuality.medium,
-              objectFit: widget.fit,
+              objectFit: widget.fit.toRTCType(),
             );
           },
         );
@@ -196,7 +224,7 @@ class _VideoTrackRendererState extends State<VideoTrackRenderer> {
         widget.renderMode == VideoRenderMode.platformView) {
       return rtc.RTCVideoPlatFormView(
         mirror: _shouldMirror(),
-        objectFit: widget.fit,
+        objectFit: widget.fit.toRTCType(),
         onViewReady: (controller) {
           _renderer = controller;
           _renderer?.srcObject = widget.track.mediaStream;
@@ -208,7 +236,7 @@ class _VideoTrackRendererState extends State<VideoTrackRenderer> {
       _renderer! as rtc.RTCVideoRenderer,
       mirror: _shouldMirror(),
       filterQuality: FilterQuality.medium,
-      objectFit: widget.fit,
+      objectFit: widget.fit.toRTCType(),
     );
   }
 
@@ -254,8 +282,52 @@ class _VideoTrackRendererState extends State<VideoTrackRenderer> {
   // FutureBuilder will cause flickering for flutter web. so using
   // different rendering methods for web and native.
   @override
-  Widget build(BuildContext context) =>
-      kIsWeb ? _videoViewForWeb() : _videoViewForNative();
+  Widget build(BuildContext context) {
+    final child = kIsWeb ? _videoViewForWeb() : _videoViewForNative();
+
+    if (widget.fit == VideoViewFit.cover) {
+      return child;
+    }
+
+    final videoView = LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        if (!constraints.hasBoundedWidth && !constraints.hasBoundedHeight) {
+          return child;
+        }
+        if (_aspectRatio == null) {
+          return child;
+        }
+
+        bool fixHeight;
+        if (!constraints.hasBoundedWidth) {
+          fixHeight = true;
+        } else if (!constraints.hasBoundedHeight) {
+          fixHeight = false;
+        } else {
+          // both width and height are bound, figure out which to fix based on aspect ratios
+          final constraintsAspectRatio =
+              constraints.maxWidth / constraints.maxHeight;
+          fixHeight = constraintsAspectRatio > _aspectRatio!;
+        }
+        final double width;
+        final double height;
+        if (fixHeight) {
+          height = constraints.maxHeight;
+          width = height * _aspectRatio!;
+        } else {
+          width = constraints.maxWidth;
+          height = width / _aspectRatio!;
+        }
+        return SizedBox(width: width, height: height, child: child);
+      },
+    );
+
+    if (widget.autoCenter) {
+      return Center(child: videoView);
+    } else {
+      return videoView;
+    }
+  }
 
   bool _shouldMirror() {
     // off for screen share

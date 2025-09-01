@@ -14,7 +14,7 @@
 
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' hide internal;
 
 import 'package:collection/collection.dart';
 import 'package:http/http.dart' as http;
@@ -47,6 +47,7 @@ import '../track/track.dart';
 import '../types/data_stream.dart';
 import '../types/other.dart';
 import '../types/rpc.dart';
+import '../types/transcription_segment.dart';
 import '../utils.dart';
 import 'engine.dart';
 
@@ -551,7 +552,8 @@ class Room extends DisposableChangeNotifier with EventsEmittable<RoomEvent> {
       notifyListeners();
     })
     ..on<EngineDisconnectedEvent>((event) async {
-      if (!engine.fullReconnectOnNext) {
+      if (!engine.fullReconnectOnNext ||
+          event.reason == DisconnectReason.clientInitiated) {
         await _cleanUp(disposeLocalParticipant: false);
         events.emit(RoomDisconnectedEvent(reason: event.reason));
         notifyListeners();
@@ -622,14 +624,18 @@ class Room extends DisposableChangeNotifier with EventsEmittable<RoomEvent> {
 
   /// Disconnects from the room, notifying server of disconnection.
   Future<void> disconnect() async {
+    bool isPendingReconnect = engine.isPendingReconnect;
     if (engine.isClosed &&
+        !isPendingReconnect &&
         engine.connectionState == ConnectionState.disconnected) {
       logger.warning('Engine is already closed');
       return;
     }
     await engine.disconnect();
-    await _engineListener.waitFor<EngineDisconnectedEvent>(
-        duration: const Duration(seconds: 10));
+    if (!isPendingReconnect) {
+      await _engineListener.waitFor<EngineDisconnectedEvent>(
+          duration: const Duration(seconds: 10));
+    }
     await _cleanUp();
   }
 
@@ -1092,17 +1098,28 @@ extension RoomHardwareManagementMethods on Room {
   /// Set video input device.
   Future<void> setVideoInputDevice(MediaDevice device) async {
     final track = localParticipant?.videoTrackPublications.firstOrNull?.track;
-    if (track == null) return;
-    if (selectedVideoInputDeviceId != device.deviceId) {
-      await track.switchCamera(device.deviceId);
-      Hardware.instance.selectedVideoInput = device;
-    }
+
+    final currentDeviceId =
+        engine.roomOptions.defaultCameraCaptureOptions.deviceId;
+
+    // Always update roomOptions so future tracks use the correct device
     engine.roomOptions = engine.roomOptions.copyWith(
-      defaultCameraCaptureOptions:
-          roomOptions.defaultCameraCaptureOptions.copyWith(
-        deviceId: device.deviceId,
-      ),
+      defaultCameraCaptureOptions: roomOptions.defaultCameraCaptureOptions
+          .copyWith(deviceId: device.deviceId),
     );
+
+    try {
+      if (track != null && selectedVideoInputDeviceId != device.deviceId) {
+        await track.switchCamera(device.deviceId);
+        Hardware.instance.selectedVideoInput = device;
+      }
+    } catch (e) {
+      // if the switching actually fails, reset it to the previous deviceId
+      engine.roomOptions = engine.roomOptions.copyWith(
+        defaultCameraCaptureOptions: roomOptions.defaultCameraCaptureOptions
+            .copyWith(deviceId: currentDeviceId),
+      );
+    }
   }
 
   /// [speakerOn] set speakerphone on or off, by default wired/bluetooth headsets will still
