@@ -7,6 +7,7 @@ Similar to [Flutter-WebRTC](https://github.com/flutter-webrtc/flutter-webrtc) th
 Supported platforms:  
 * Android
 * iOS
+* Web
 
 ## LiveKit demo app
 
@@ -14,7 +15,9 @@ There are some changes in **client-sdk-flutter/example** app, so you can build i
 
 ## How to use
 
-1. Add livekit dependency into your project, if If original **livekit** is already used, replace it with this fork.
+There is some API differences between Web platform and mobile platforms.
+
+Add livekit dependency into your project, if If original **livekit** is already used, replace it with this fork.
 ```yaml
 dependencies:
   livekit_client:
@@ -22,9 +25,18 @@ dependencies:
       url: https://github.com/EffectsSDK/livekit-client-sdk-flutter.git
 ```
 
-2. Create cameraVideoTrack by using LocalVideoTrack.createCameraTrack() with effectsEdkRequired flag
-3. Call auth() method with your customer key
-4. Set Effects SDK parameters for your video track
+For the web, add the next line to your index.html.
+```html
+<script src="https://effectssdk.ai/sdk/web/3.5.7/tsvb-web.js"></script>
+```
+Call [VideoEffectsSDKExt.initialize](https://effectssdk.ai/sdk/livekit-flutter/livekit_client/VideoEffectsSDKExt/initialize.html) method before the first `LocalVideoTrack.createCameraTrack` call.
+```dart
+VideoEffectsSDKExt.initialize('YOUR_CUSTOMER_ID');
+```
+
+1. Create cameraVideoTrack by using LocalVideoTrack.createCameraTrack() with effectsEdkRequired flag
+2. Call auth() method with your customer key if Android/iOS platform.
+3. Set Effects SDK parameters for your video track
 
 ```dart
 _videoTrack = await LocalVideoTrack.createCameraTrack(
@@ -80,7 +92,7 @@ Also you can replace CameraPipeline to lite version of it.
 
 ## Additional links
 
-1. Platform documentation ([iOS](https://effectssdk.ai/sdk/ios/documentation/tsvb), [android](https://github.com/EffectsSDK/android-integration-sample))
+1. Platform documentation ([iOS](https://effectssdk.ai/sdk/ios/documentation/tsvb), [android](https://github.com/EffectsSDK/android-integration-sample), [web](https://effectssdk.ai/sdk/web/docs/classes/tsvb.html))
 2. Effects SDK [site](https://effectssdk.ai/)
 3. Original livekit API documentation [site](https://docs.livekit.io/reference/client-sdk-flutter/)
 

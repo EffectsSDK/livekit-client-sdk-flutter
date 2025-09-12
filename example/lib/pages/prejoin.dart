@@ -5,6 +5,7 @@ import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:livekit_example/exts.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../theme.dart';
 import 'room.dart';
@@ -53,7 +54,10 @@ class _PreJoinPageState extends State<PreJoinPage> {
   bool _remove = false;
   bool _blur = true;
   bool _colorCorrection = false;
+  bool _lowLight = false;
   bool _smartZoom = false;
+  bool _beautification = false;
+  bool _sharpening = false;
   bool _enableAudio = true;
   LocalAudioTrack? _audioTrack;
   LocalVideoTrack? _videoTrack;
@@ -152,10 +156,38 @@ class _PreJoinPageState extends State<PreJoinPage> {
     if (_colorCorrection){
       await _videoTrack!.setColorCorrectionMode(ColorCorrectionMode.colorCorrectionMode);
       await _videoTrack!.setColorFilterStrength(0.5);
+      _lowLight = false;
     } else {
       await _videoTrack!.setColorCorrectionMode(ColorCorrectionMode.noFilterMode);
       await _videoTrack!.setColorFilterStrength(0.0);
     }
+    setState(() {});
+  }
+
+  Future<void> _setLowLightSdk(value) async {
+    _lowLight = value;
+    if (_lowLight){
+      await _videoTrack!.setColorCorrectionMode(ColorCorrectionMode.lowLightMode);
+      _colorCorrection = false;
+      await _videoTrack!.setColorFilterStrength(0.7);
+    } else {
+      await _videoTrack!.setColorCorrectionMode(ColorCorrectionMode.noFilterMode);
+      await _videoTrack!.setColorFilterStrength(0.0);
+    }
+    setState(() {});
+  }
+
+  Future<void> _setBeautificationSdk(value) async {
+    await _videoTrack!.enableBeautification(value);
+    _beautification = value;
+    final _ = _videoTrack!.setBeautificationPower(1);
+    setState(() {});
+  }
+
+  Future<void> _setSharpeningSdk(value) async {
+    await _videoTrack!.enableSharpening(value);
+    _sharpening = value;
+    final _ = _videoTrack!.setSharpeningStrength(0.2);
     setState(() {});
   }
 
@@ -203,6 +235,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
     }
 
     if (_selectedVideoDevice != null) {
+      VideoEffectsSDKExt.initialize('CUSTOMER_ID');
       _videoTrack = await LocalVideoTrack.createCameraTrack(CameraCaptureOptions(
         deviceId: _selectedVideoDevice!.deviceId,
         params: _selectedVideoParameters,
@@ -210,7 +243,11 @@ class _PreJoinPageState extends State<PreJoinPage> {
         effectsSdkRequired: true,
       ));
       await _videoTrack!.start();
-      // initialize Effects SDK
+      Future<void>.delayed(Duration.zero, (){ _setupVideoEffects(); });
+    }
+  }
+
+  Future<void> _setupVideoEffects() async {
       AuthStatus status = await _videoTrack!.auth('YOUR_CUSTOMER_KEY');
       switch (status){
         case AuthStatus.active:
@@ -230,8 +267,10 @@ class _PreJoinPageState extends State<PreJoinPage> {
       await _setBlurModeSdk(_blur);
       await _setReplaceModeSdk(_remove);
       await _setColorCorrectionSdk(_colorCorrection);
+      await _setColorCorrectionSdk(_lowLight);
       await _setSmartZoomSdk(_smartZoom);
-    }
+      await _setBeautificationSdk(_beautification);
+      await _setSharpeningSdk(_sharpening);
   }
 
   @override
@@ -459,6 +498,45 @@ class _PreJoinPageState extends State<PreJoinPage> {
                           Switch(
                             value: _colorCorrection,
                             onChanged: (value) => _setColorCorrectionSdk(value),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 5),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('LowLight:'),
+                          Switch(
+                            value: _lowLight,
+                            onChanged: (value) => _setLowLightSdk(value),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 5),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Beautification:'),
+                          Switch(
+                            value: _beautification,
+                            onChanged: (value) => _setBeautificationSdk(value),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 5),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Sharpening:'),
+                          Switch(
+                            value: _sharpening,
+                            onChanged: (value) => _setSharpeningSdk(value),
                           ),
                         ],
                       ),

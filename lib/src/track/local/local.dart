@@ -134,15 +134,18 @@ abstract class LocalTrack extends Track {
   @override
   Future<bool> stop() async {
     final didStop = await super.stop() || !_stopped;
+    final originalStream = await rtc.VideoEffectsSdk.getWrappedStream(mediaStream);
     if (didStop) {
       logger.fine('Stopping mediaStreamTrack...');
       try {
         await mediaStreamTrack.stop();
+        await originalStream?.getVideoTracks().first.stop();
       } catch (error) {
         logger.severe('MediaStreamTrack.stop() did throw $error');
       }
       try {
         await mediaStream.dispose();
+        await originalStream?.dispose();
       } catch (error) {
         logger.severe('MediaStreamTrack.dispose() did throw $error');
       }

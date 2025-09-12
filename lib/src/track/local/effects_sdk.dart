@@ -17,15 +17,28 @@ import 'video.dart';
 
 /// Video Effects SDK extensions to enable/disable SDK's filters
 extension VideoEffectsSDKExt on LocalVideoTrack {
+
+  /// Initializes Video Effects SDK for the web.
+  ///
+  /// Should be called before the first `LocalVideoTrack.createCameraTrack` call.
+  /// For native platforms do nothing.
+  /// - [customerID]: Unique customerID for authentication
+  /// - [preload]: Start preloading models if true. 
+  /// - [config]: Optional Web SDK configuration.
+  static void initialize(String customerID, {bool preload = false, rtc.VideoEffectSDKConfig? config}) {
+    return rtc.VideoEffectsSdk.initialize(customerID, preload: preload, config: config);
+  }
   
-  /// Authenticates SDK using remote service.
+  /// Authenticates SDK using remote service (for Android & iOS).
   ///
   /// Method performs https request to obtain license for customerID.
+  /// For the web, this method waits until models are loaded.
   /// - [customerID]: License key for authentication
   /// - [apiUrl]: Optional custom authentication api server url
   /// - Returns: [AuthStatus] indicating authentication result
   Future<rtc.AuthStatus> auth(String customerID, {String? apiUrl}) async {
-    return rtc.VideoEffectsSdk.auth(mediaStreamTrack, customerID, apiUrl:apiUrl);
+    await rtc.VideoEffectsSdk.auth(mediaStreamTrack, customerID, apiUrl: apiUrl);
+    return rtc.AuthStatus.active;
   }
 
   /// Offline authorization with a secret key.
@@ -47,7 +60,7 @@ extension VideoEffectsSDKExt on LocalVideoTrack {
 
   /// Sets background processing mode for a media track.
   /// 
-  /// - [pipelineMode]: New processing mode to apply
+  /// - [mode]: New processing mode to apply
   Future<void> setPipelineMode(rtc.PipelineMode mode) {
     return rtc.VideoEffectsSdk.setPipelineMode(mediaStreamTrack, mode);
   }

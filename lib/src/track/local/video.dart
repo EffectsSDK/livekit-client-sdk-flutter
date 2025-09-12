@@ -16,6 +16,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:collection/collection.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
+import 'package:livekit_client/livekit_client.dart';
 
 import '../../events.dart';
 import '../../exceptions.dart';
@@ -186,8 +187,10 @@ class LocalVideoTrack extends LocalTrack with VideoTrack {
     CameraCaptureOptions? options,
   ]) async {
     options ??= const CameraCaptureOptions();
+    bool needWrapStream = options.effectsSdkRequired ?? false;
 
-    final stream = await LocalTrack.createStream(options);
+    final stream_ = await LocalTrack.createStream(options);
+    final stream = needWrapStream? await rtc.VideoEffectsSdk.wrapStream(stream_) : stream_;
     var track = LocalVideoTrack._(
       TrackSource.camera,
       stream,
