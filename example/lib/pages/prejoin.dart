@@ -10,6 +10,9 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../theme.dart';
 import 'room.dart';
 
+import 'package:flutter/services.dart' show rootBundle;
+import 'dart:typed_data';
+
 class JoinArgs {
   JoinArgs({
     required this.url,
@@ -51,7 +54,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
   bool _busy = false;
   bool _enableVideo = true;
   bool paused = false;
-  bool _remove = false;
+  bool _replace = false;
   bool _blur = true;
   bool _colorCorrection = false;
   bool _lowLight = false;
@@ -128,11 +131,13 @@ class _PreJoinPageState extends State<PreJoinPage> {
   }
 
   Future<void> _setReplaceModeSdk(value) async {
-    _remove = value;
-    if (_remove) {
+    _replace = value;
+    if (_replace) {
       _blur = false;
       await _videoTrack!.setPipelineMode(PipelineMode.replace);
-      await _videoTrack!.setBackgroundImage(EffectsSdkImage.fromRGB(r: 0, g: 0.8, b: 0));
+      final ByteData data = await rootBundle.load("images/demo-background.jpg");
+      final Uint8List bytes = data.buffer.asUint8List();
+      await _videoTrack!.setBackgroundImage(EffectsSdkImage.fromEncoded(bytes));
     } else if (PipelineMode.replace == await _videoTrack!.getPipelineMode()) {
       await _videoTrack!.setPipelineMode(PipelineMode.noEffects);
     }
@@ -142,7 +147,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
   Future<void> _setBlurModeSdk(value) async {
     _blur = value;
     if (_blur) {
-      _remove = false;
+      _replace = false;
       await _videoTrack!.setPipelineMode(PipelineMode.blur);
       await _videoTrack!.setBlurPower(0.7);
     } else if (PipelineMode.blur == await _videoTrack!.getPipelineMode()) {
@@ -185,8 +190,8 @@ class _PreJoinPageState extends State<PreJoinPage> {
   }
 
   Future<void> _setSharpeningSdk(value) async {
-    await _videoTrack!.enableSharpening(value);
     _sharpening = value;
+    await _videoTrack!.enableSharpening(value);
     final _ = _videoTrack!.setSharpeningStrength(0.2);
     setState(() {});
   }
@@ -253,19 +258,24 @@ class _PreJoinPageState extends State<PreJoinPage> {
         case AuthStatus.active:
           break;
         case AuthStatus.expired:
-          // TODO: Handle this case as you need.
+          // TODO: Handle this case.
           return;
         case AuthStatus.inactive:
-          // TODO: Handle this case as you need.
+          // TODO: Handle this case.
           return;
         case AuthStatus.unavailable:
-          // TODO: Handle this case as you need.
+          // TODO: Handle this case.
           return;
+        case AuthStatus.error:
+          // TODO: Handle this case.
+          break;
       }
-
       //Set pipeline options
-      await _setBlurModeSdk(_blur);
-      await _setReplaceModeSdk(_remove);
+      if (_blur) {
+        await _setBlurModeSdk(_blur);
+      } else {
+        await _setReplaceModeSdk(_replace);
+      }
       await _setColorCorrectionSdk(_colorCorrection);
       await _setColorCorrectionSdk(_lowLight);
       await _setSmartZoomSdk(_smartZoom);
@@ -455,9 +465,9 @@ class _PreJoinPageState extends State<PreJoinPage> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Remove:'),
+                          const Text('Replace:'),
                           Switch(
-                            value: _remove,
+                            value: _replace,
                             onChanged: (value) => _setReplaceModeSdk(value),
                           ),
                         ],
