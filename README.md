@@ -82,6 +82,7 @@ To receive a new trial Customer ID, please fill out the contact form on the [eff
 Check platform specifications:
 1. [iOS](https://github.com/EffectsSDK/swift-video-effects-sdk)
 2. [android](https://github.com/EffectsSDK/android-integration-sample)
+3. [web](https://github.com/EffectsSDK/video-effects-sdk-web)
 
 ## Technical details
 
