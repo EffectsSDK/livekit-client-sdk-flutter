@@ -19,4 +19,12 @@ library livekit_client;
 export 'src/track/local/effects_sdk.dart';
 
 export 'package:flutter_webrtc/flutter_webrtc.dart' 
-    show AuthStatus, EffectsSdkImage, RawImageFormat, PipelineMode, ColorCorrectionMode;
+    show AuthStatus, 
+      EffectsSdkImage, 
+      RawImageFormat, 
+      PipelineMode, 
+      ColorCorrectionMode, 
+      VideoEffectSDKConfig,
+      VideoEffect,
+      SegmentationPreset,
+      WebInferenceProvider;
