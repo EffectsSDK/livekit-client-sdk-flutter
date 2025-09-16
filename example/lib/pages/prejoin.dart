@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:dropdown_button2/dropdown_button2.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:livekit_example/exts.dart';
@@ -54,13 +55,21 @@ class _PreJoinPageState extends State<PreJoinPage> {
   bool _busy = false;
   bool _enableVideo = true;
   bool paused = false;
+  bool _isFirstSetup = true;
   bool _replace = false;
-  bool _blur = true;
+  bool _replaceLoading = false;
+  bool _blur = false;
+  bool _blurLoading = false;
   bool _colorCorrection = false;
+  bool _colorCorrectionLoading = false;
   bool _lowLight = false;
+  bool _lowLightLoading = false;
   bool _smartZoom = false;
+  bool _smartZoomLoading = false;
   bool _beautification = false;
+  bool _beautificationLoading = false;
   bool _sharpening = false;
+  bool _sharpeningLoading = false;
   bool _enableAudio = true;
   LocalAudioTrack? _audioTrack;
   LocalVideoTrack? _videoTrack;
@@ -131,79 +140,122 @@ class _PreJoinPageState extends State<PreJoinPage> {
   }
 
   Future<void> _setReplaceModeSdk(value) async {
-    _replace = value;
-    if (_replace) {
-      _blur = false;
-      await _videoTrack!.setPipelineMode(PipelineMode.replace);
-      final ByteData data = await rootBundle.load("images/demo-background.jpg");
-      final Uint8List bytes = data.buffer.asUint8List();
-      await _videoTrack!.setBackgroundImage(EffectsSdkImage.fromEncoded(bytes));
-    } else if (PipelineMode.replace == await _videoTrack!.getPipelineMode()) {
-      await _videoTrack!.setPipelineMode(PipelineMode.noEffects);
+    setState(() { _replaceLoading = true; });
+    try {
+      if (value) {
+        await _videoTrack!.setPipelineMode(PipelineMode.replace);
+        final ByteData data = await rootBundle.load('images/demo-background.jpg');
+        final Uint8List bytes = data.buffer.asUint8List();
+        await _videoTrack!.setBackgroundImage(EffectsSdkImage.fromEncoded(bytes));
+      } else if (PipelineMode.replace == await _videoTrack!.getPipelineMode()) {
+        await _videoTrack!.setPipelineMode(PipelineMode.noEffects);
+      }
+      setState(() {
+        _replace = value;
+        _blur = false;
+      });
     }
-    setState(() {});
+    finally {
+      setState(() { _replaceLoading = false; });
+    }
   }
 
   Future<void> _setBlurModeSdk(value) async {
-    _blur = value;
-    if (_blur) {
-      _replace = false;
-      await _videoTrack!.setPipelineMode(PipelineMode.blur);
-      await _videoTrack!.setBlurPower(0.7);
-    } else if (PipelineMode.blur == await _videoTrack!.getPipelineMode()) {
-      await _videoTrack!.setPipelineMode(PipelineMode.noEffects);
+    setState(() {_blurLoading = true;});
+    try {
+      if (value) {
+        await _videoTrack!.setPipelineMode(PipelineMode.blur);
+        await _videoTrack!.setBlurPower(0.7);
+      } else if (PipelineMode.blur == await _videoTrack!.getPipelineMode()) {
+        await _videoTrack!.setPipelineMode(PipelineMode.noEffects);
+      }
+      setState(() {
+        _replace = false; 
+        _blur = value;
+      });
     }
-    setState(() {});
+    finally {
+      setState(() {_blurLoading = false;});
+    }
   }
 
   Future<void> _setColorCorrectionSdk(value) async {
-    _colorCorrection = value;
-    if (_colorCorrection){
-      await _videoTrack!.setColorCorrectionMode(ColorCorrectionMode.colorCorrectionMode);
-      await _videoTrack!.setColorFilterStrength(0.5);
-      _lowLight = false;
-    } else {
-      await _videoTrack!.setColorCorrectionMode(ColorCorrectionMode.noFilterMode);
-      await _videoTrack!.setColorFilterStrength(0.0);
+    setState(() {_colorCorrectionLoading = true;});
+    try {
+      if (value) {
+        await _videoTrack!.setColorCorrectionMode(ColorCorrectionMode.colorCorrectionMode);
+        await _videoTrack!.setColorFilterStrength(0.5);
+      } else {
+        await _videoTrack!.setColorCorrectionMode(ColorCorrectionMode.noFilterMode);
+        await _videoTrack!.setColorFilterStrength(0.0);
+      }
+      setState(() {
+        _lowLight = false;
+        _colorCorrection = value;
+      });
     }
-    setState(() {});
+    finally {
+      setState(() {_colorCorrectionLoading = false;});
+    }
   }
 
   Future<void> _setLowLightSdk(value) async {
-    _lowLight = value;
-    if (_lowLight){
-      await _videoTrack!.setColorCorrectionMode(ColorCorrectionMode.lowLightMode);
-      _colorCorrection = false;
-      await _videoTrack!.setColorFilterStrength(0.7);
-    } else {
-      await _videoTrack!.setColorCorrectionMode(ColorCorrectionMode.noFilterMode);
-      await _videoTrack!.setColorFilterStrength(0.0);
+    setState(() {_lowLightLoading = true;});
+    try {
+      if (value) {
+        await _videoTrack!.setColorCorrectionMode(ColorCorrectionMode.lowLightMode);
+        await _videoTrack!.setColorFilterStrength(0.7);
+      } else {
+        await _videoTrack!.setColorCorrectionMode(ColorCorrectionMode.noFilterMode);
+        await _videoTrack!.setColorFilterStrength(0.0);
+      }
+      setState(() {
+        _lowLight = value;
+        _colorCorrection = false;
+      });
     }
-    setState(() {});
+    finally {
+      setState(() {_lowLightLoading = false;});
+    }
   }
 
   Future<void> _setBeautificationSdk(value) async {
-    await _videoTrack!.enableBeautification(value);
-    _beautification = value;
-    final _ = _videoTrack!.setBeautificationPower(1);
-    setState(() {});
+    setState(() {_beautificationLoading = true;});
+    try {
+      await _videoTrack!.enableBeautification(value);
+      setState(() {_beautification = value;});
+      final _ = _videoTrack!.setBeautificationPower(1);
+    } 
+    finally {
+      setState(() {_beautificationLoading = false;});
+    }
   }
 
   Future<void> _setSharpeningSdk(value) async {
-    _sharpening = value;
-    await _videoTrack!.enableSharpening(value);
-    final _ = _videoTrack!.setSharpeningStrength(0.2);
-    setState(() {});
+    setState(() {_sharpeningLoading = true;});
+    try {
+      await _videoTrack!.enableSharpening(value);
+      final _ = _videoTrack!.setSharpeningStrength(0.8);
+      setState(() {_sharpening = value;});
+    } 
+    finally {
+      setState(() {_sharpeningLoading = false;});
+    }
   }
 
   Future<void> _setSmartZoomSdk(value) async {
-    _smartZoom = value;
-    if (_smartZoom) {
-      await _videoTrack!.setZoomLevel(0.5);
-    } else {
-      await _videoTrack!.setZoomLevel(0);
+    setState(() {_smartZoomLoading = true;});
+    try {
+      if (value) {
+        await _videoTrack!.setZoomLevel(0.5);
+      } else {
+        await _videoTrack!.setZoomLevel(0);
+      }
+      setState(() {_smartZoom = value;});
+    } 
+    finally {
+      setState(() {_smartZoomLoading = false;});
     }
-    setState(() {});
   }
 
   Future<void> _setEnableAudio(value) async {
@@ -253,6 +305,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
   }
 
   Future<void> _setupVideoEffects() async {
+    if (!kIsWeb) {
       AuthStatus status = await _videoTrack!.auth('YOUR_CUSTOMER_KEY');
       switch (status){
         case AuthStatus.active:
@@ -270,17 +323,21 @@ class _PreJoinPageState extends State<PreJoinPage> {
           // TODO: Handle this case.
           break;
       }
-      //Set pipeline options
-      if (_blur) {
-        await _setBlurModeSdk(_blur);
-      } else {
-        await _setReplaceModeSdk(_replace);
-      }
-      await _setColorCorrectionSdk(_colorCorrection);
-      await _setColorCorrectionSdk(_lowLight);
-      await _setSmartZoomSdk(_smartZoom);
-      await _setBeautificationSdk(_beautification);
-      await _setSharpeningSdk(_sharpening);
+    }
+
+    //Set pipeline options
+    if (_blur) await _setBlurModeSdk(_blur);
+    if (_replace) await _setReplaceModeSdk(_replace);
+    if (_colorCorrection) await _setColorCorrectionSdk(_colorCorrection);
+    if (_lowLight) await _setLowLightSdk(_lowLight);
+    if (_smartZoom) await _setSmartZoomSdk(_smartZoom);
+    if (_beautification) await _setBeautificationSdk(_beautification);
+    if (_sharpening) await _setSharpeningSdk(_sharpening);
+
+    if (_isFirstSetup) {
+      _isFirstSetup = false;
+      _setBlurModeSdk(true);
+    }
   }
 
   @override
@@ -380,6 +437,28 @@ class _PreJoinPageState extends State<PreJoinPage> {
     Navigator.of(context).pop();
   }
 
+  Widget sdkSwitcher({
+    required String title, 
+    required bool value, 
+    required void Function(bool) onChanged,
+    bool loading = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title),
+          const Spacer(),
+          if (loading) const CircularProgressIndicator(padding:EdgeInsets.only(right: 6)),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -460,96 +539,47 @@ class _PreJoinPageState extends State<PreJoinPage> {
                         ],
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 5),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Replace:'),
-                          Switch(
-                            value: _replace,
-                            onChanged: (value) => _setReplaceModeSdk(value),
-                          ),
-                        ],
-                      ),
+                    sdkSwitcher(
+                      title: 'Replace:',
+                      value: _replace, 
+                      onChanged: _setReplaceModeSdk,
+                      loading: _replaceLoading
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 5),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Blur:'),
-                          Switch(
-                            value: _blur,
-                            onChanged: (value) => _setBlurModeSdk(value),
-                          ),
-                        ],
-                      ),
+                    sdkSwitcher(
+                      title: 'Blur:',
+                      value: _blur, 
+                      onChanged: _setBlurModeSdk,
+                      loading: _blurLoading
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 5),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('SmartZoom:'),
-                          Switch(
-                            value: _smartZoom,
-                            onChanged: (value) => _setSmartZoomSdk(value),
-                          ),
-                        ],
-                      ),
+                    sdkSwitcher(
+                      title: 'Smart Zoom:',
+                      value: _smartZoom, 
+                      onChanged: _setSmartZoomSdk,
+                      loading: _smartZoomLoading
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 5),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('ColorCorrection:'),
-                          Switch(
-                            value: _colorCorrection,
-                            onChanged: (value) => _setColorCorrectionSdk(value),
-                          ),
-                        ],
-                      ),
+                    sdkSwitcher(
+                      title: 'Color Correction:',
+                      value: _colorCorrection, 
+                      onChanged: _setColorCorrectionSdk,
+                      loading: _colorCorrectionLoading
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 5),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('LowLight:'),
-                          Switch(
-                            value: _lowLight,
-                            onChanged: (value) => _setLowLightSdk(value),
-                          ),
-                        ],
-                      ),
+                    sdkSwitcher(
+                      title: 'Low Light Adjustment:',
+                      value: _lowLight, 
+                      onChanged: _setLowLightSdk,
+                      loading: _lowLightLoading
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 5),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Beautification:'),
-                          Switch(
-                            value: _beautification,
-                            onChanged: (value) => _setBeautificationSdk(value),
-                          ),
-                        ],
-                      ),
+                    sdkSwitcher(
+                      title: 'Beautification:',
+                      value: _beautification, 
+                      onChanged: _setBeautificationSdk,
+                      loading: _beautificationLoading
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 5),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Sharpening:'),
-                          Switch(
-                            value: _sharpening,
-                            onChanged: (value) => _setSharpeningSdk(value),
-                          ),
-                        ],
-                      ),
+                    sdkSwitcher(
+                      title: 'Sharpening:',
+                      value: _sharpening, 
+                      onChanged: _setSharpeningSdk,
+                      loading: _sharpeningLoading
                     ),
                     Padding(
                       padding: const EdgeInsets.only(bottom: 25),
