@@ -40,7 +40,7 @@ dependencies:
   flutter_webrtc:
     git:
       url: https://github.com/EffectsSDK/flutter-webrtc.git
-      ref: fbbd2619b51cfd149dba398d39ba4a59439d3f2e
+      ref: add3e8d76e6b1a76721e65415b00a8194a087689
   device_info_plus: ^11.3.0
   sdp_transform: ^0.3.2
   web: ^1.0.0
