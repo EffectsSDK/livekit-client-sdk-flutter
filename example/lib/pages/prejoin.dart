@@ -301,7 +301,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
         effectsSdkRequired: true,
       ));
       await _videoTrack!.start();
-      await Future<void>.delayed(Duration.zero, (){  _setupVideoEffects(); });
+      Future<void>.delayed(Duration.zero, (){ _setupVideoEffects(); });
     }
   }
 

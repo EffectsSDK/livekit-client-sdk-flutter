@@ -47,8 +47,8 @@ dependencies:
   dart_webrtc: ^1.6.0
   flutter_webrtc:
     git:
-      url: https://github.com/EffectsSDK/flutter-webrtc.git
-      ref: 8cd3fea7e7930aaf88c6ba30ca3c78a7112fb874
+      url: git@git.tomsksoft.com:tomsksoft/virtual-background-sdk/flutter-webrtc-patch.git
+      ref: d731d2d7062a225a5c89232127013c19726aa12f
 
 dev_dependencies:
   flutter_test:

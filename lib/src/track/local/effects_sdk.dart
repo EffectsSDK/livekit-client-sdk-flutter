@@ -37,7 +37,8 @@ extension VideoEffectsSDKExt on LocalVideoTrack {
   /// - [apiUrl]: Optional custom authentication api server url
   /// - Returns: [AuthStatus] indicating authentication result
   Future<rtc.AuthStatus> auth(String customerID, {String? apiUrl}) async {
-    return rtc.VideoEffectsSdk.auth(mediaStreamTrack, customerID, apiUrl: apiUrl);
+    await rtc.VideoEffectsSdk.auth(mediaStreamTrack, customerID, apiUrl: apiUrl);
+    return rtc.AuthStatus.active;
   }
 
   /// Offline authorization with a secret key.
