@@ -28,7 +28,7 @@ extension VideoEffectsSDKExt on LocalVideoTrack {
   static void initialize(String customerID, {bool preload = false, rtc.VideoEffectSDKConfig? config}) {
     return rtc.VideoEffectsSdk.initialize(customerID, preload: preload, config: config);
   }
-  
+
   /// Authenticates SDK using remote service (for Android & iOS).
   ///
   /// Method performs https request to obtain license for customerID.
@@ -36,7 +36,7 @@ extension VideoEffectsSDKExt on LocalVideoTrack {
   /// - [customerID]: License key for authentication
   /// - [apiUrl]: Optional custom authentication api server url
   /// - Returns: [AuthStatus] indicating authentication result
-  Future<rtc.AuthStatus> auth(String customerID, {String? apiUrl}) {
+  Future<rtc.AuthStatus> auth(String customerID, {String? apiUrl}) async {
     return rtc.VideoEffectsSdk.auth(mediaStreamTrack, customerID, apiUrl: apiUrl);
   }
 
