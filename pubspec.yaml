@@ -48,7 +48,7 @@ dependencies:
   flutter_webrtc:
     git:
       url: git@git.tomsksoft.com:tomsksoft/virtual-background-sdk/flutter-webrtc-patch.git
-      ref: d731d2d7062a225a5c89232127013c19726aa12f
+      ref: 8cd3fea7e7930aaf88c6ba30ca3c78a7112fb874
 
 dev_dependencies:
   flutter_test:
