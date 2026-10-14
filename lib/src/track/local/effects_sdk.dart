@@ -161,4 +161,73 @@ extension VideoEffectsSDKExt on LocalVideoTrack {
   Future<void> setColorGradingReference(rtc.EffectsSdkImage reference) {
     return rtc.VideoEffectsSdk.setColorGradingReference(mediaStreamTrack, reference);
   }
+
+  /// Enables/disables video noise suppression.
+  ///
+  /// Currently supported only on Android.
+  /// - [enable]: true to enable, false to disable
+  Future<void> enableNoiseSuppression(bool enable) {
+    return rtc.VideoEffectsSdk.enableNoiseSuppression(mediaStreamTrack, enable);
+  }
+
+  /// Enables/disables portrait lighting effect.
+  ///
+  /// Currently supported only on Android.
+  /// - [enable]: true to enable, false to disable
+  Future<void> enablePortraitLighting(bool enable) {
+    return rtc.VideoEffectsSdk.enablePortraitLighting(mediaStreamTrack, enable);
+  }
+
+  /// Sets portrait lighting effect options.
+  ///
+  /// Currently supported only on Android.
+  /// - [options]: New portrait lighting options
+  Future<void> setPortraitLightingOptions(rtc.PortraitLightingOptions options) {
+    return rtc.VideoEffectsSdk.setPortraitLightingOptions(mediaStreamTrack, options);
+  }
+
+  /// Sets low light effect configuration.
+  ///
+  /// Applied in [rtc.ColorCorrectionMode.lowLightMode].
+  /// Currently supported only on Android.
+  /// - [config]: New low light configuration
+  Future<void> setLowLightConfig(rtc.LowLightConfig config) {
+    return rtc.VideoEffectsSdk.setLowLightConfig(mediaStreamTrack, config);
+  }
+
+  /// Adjusts low light effect strength.
+  ///
+  /// Applied in [rtc.ColorCorrectionMode.lowLightMode].
+  /// Currently supported only on Android.
+  /// - [power]: Effect strength
+  Future<void> setLowLightPower(double power) {
+    return rtc.VideoEffectsSdk.setLowLightPower(mediaStreamTrack, power);
+  }
+
+  /// Sets color correction configuration.
+  ///
+  /// Applied in [rtc.ColorCorrectionMode.colorCorrectionMode].
+  /// Currently supported only on Android.
+  /// - [config]: New color correction configuration
+  Future<void> setColorCorrectionConfig(rtc.ColorCorrectionConfig config) {
+    return rtc.VideoEffectsSdk.setColorCorrectionConfig(mediaStreamTrack, config);
+  }
+
+  /// Adjusts color correction effect strength.
+  ///
+  /// Applied in [rtc.ColorCorrectionMode.colorCorrectionMode].
+  /// Currently supported only on Android.
+  /// - [power]: Effect strength
+  Future<void> setColorCorrectionPower(double power) {
+    return rtc.VideoEffectsSdk.setColorCorrectionPower(mediaStreamTrack, power);
+  }
+
+  /// Sets the period of the video re-analysis for color correction.
+  ///
+  /// Applied in [rtc.ColorCorrectionMode.colorCorrectionMode].
+  /// Currently supported only on Android.
+  /// - [periodMs]: Period in milliseconds
+  Future<void> setColorCorrectionPeriod(double periodMs) {
+    return rtc.VideoEffectsSdk.setColorCorrectionPeriod(mediaStreamTrack, periodMs);
+  }
 }
