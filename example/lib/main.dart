@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:livekit_client/livekit_client.dart';
 import 'package:livekit_example/theme.dart';
 import 'package:logging/logging.dart';
 import 'package:intl/intl.dart';
 import 'pages/connect.dart';
+import 'utils.dart';
 
 void main() async {
   final format = DateFormat('HH:mm:ss');
   // configure logs for debugging
-  Logger.root.level = Level.FINE;
+  Logger.root.level = Level.FINEST;
   Logger.root.onRecord.listen((record) {
-    print('${format.format(record.time)}: ${record.message}');
+    print('${format.format(record.time)} [${record.level.name}]: ${record.message}');
   });
 
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,6 +28,12 @@ void main() async {
   /// await LiveKitClient.initialize(
   ///  bypassVoiceProcessing: lkPlatformIsMobile(),
   /// );
+  await LiveKitClient.initialize(
+    zeroPlayoutDelay: true,
+    enableWARP: true,
+  );
+  // Smoke test the Rust core with one synchronous FFI call at startup.
+  Logger('LiveKitExample').info(rustCoreVersionLabel());
   runApp(const LiveKitExampleApp());
 }
 

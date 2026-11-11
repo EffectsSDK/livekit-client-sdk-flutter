@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:collection/collection.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
-import 'package:livekit_client/livekit_client.dart';
+import 'package:meta/meta.dart';
 
 import '../../events.dart';
 import '../../exceptions.dart';
@@ -28,6 +28,7 @@ import '../../proto/livekit_rtc.pb.dart' as lk_rtc;
 import '../../stats/stats.dart';
 import '../../support/platform.dart';
 import '../../types/other.dart';
+import '../../utils.dart' show isSVCCodec;
 import '../options.dart';
 import 'audio.dart';
 import 'local.dart';
@@ -49,6 +50,8 @@ class SimulcastTrackInfo {
   });
 }
 
+bool _hasPausedLayer(lk_rtc.SubscribedCodec codec) => codec.qualities.any((q) => !q.enabled);
+
 /// A video track from the local device. Use static methods in this class to create
 /// video tracks.
 class LocalVideoTrack extends LocalTrack with VideoTrack {
@@ -66,6 +69,8 @@ class LocalVideoTrack extends LocalTrack with VideoTrack {
 
   Map<String, SimulcastTrackInfo> simulcastCodecs = {};
   Map<(String, int), rtc.RTCRtpEncoding> encodingBackups = {};
+
+  DegradationPreference? _degradationPreference;
 
   List<lk_rtc.SubscribedCodec> subscribedCodecs = [];
 
@@ -176,7 +181,8 @@ class LocalVideoTrack extends LocalTrack with VideoTrack {
   }
 
   // Private constructor
-  LocalVideoTrack._(
+  @internal
+  LocalVideoTrack(
     TrackSource source,
     rtc.MediaStream stream,
     rtc.MediaStreamTrack track,
@@ -188,11 +194,9 @@ class LocalVideoTrack extends LocalTrack with VideoTrack {
     CameraCaptureOptions? options,
   ]) async {
     options ??= const CameraCaptureOptions();
-    bool needWrapStream = options.effectsSdkRequired ?? false;
 
-    final stream_ = await LocalTrack.createStream(options);
-    final stream = needWrapStream? await rtc.VideoEffectsSdk.wrapStream(stream_) : stream_;
-    final track = LocalVideoTrack._(
+    final stream = await LocalTrack.createStream(options);
+    final track = LocalVideoTrack(
       TrackSource.camera,
       stream,
       stream.getVideoTracks().first,
@@ -221,7 +225,7 @@ class LocalVideoTrack extends LocalTrack with VideoTrack {
     options ??= const ScreenShareCaptureOptions();
 
     final stream = await LocalTrack.createStream(options);
-    return LocalVideoTrack._(
+    return LocalVideoTrack(
       TrackSource.screenShareVideo,
       stream,
       stream.getVideoTracks().first,
@@ -250,7 +254,7 @@ class LocalVideoTrack extends LocalTrack with VideoTrack {
     final stream = await LocalTrack.createStream(options);
 
     final List<LocalTrack> tracks = [
-      LocalVideoTrack._(
+      LocalVideoTrack(
         TrackSource.screenShareVideo,
         stream,
         stream.getVideoTracks().first,
@@ -288,6 +292,11 @@ extension LocalVideoTrackExt on LocalVideoTrack {
       deviceId: null,
       maxFrameRate: options.maxFrameRate,
       params: options.params,
+      effectsSdkRequired: options.effectsSdkRequired,
+      processor: options.processor,
+      stopCameraCaptureOnMute: options.stopCameraCaptureOnMute,
+      focusMode: options.focusMode,
+      exposureMode: options.exposureMode,
     );
     await restartTrack(newOptions);
     await replaceTrackForMultiCodecSimulcast(mediaStreamTrack);
@@ -321,15 +330,48 @@ extension LocalVideoTrackExt on LocalVideoTrack {
     });
   }
 
+  /// Re-applies the last subscribed codecs to the sender. A publisher answer
+  /// re-enables every layer, and dynacast only signals changes, so without this
+  /// the layers it paused keep uploading.
+  ///
+  /// Re-applying a pause needs a forced write: the answer re-enabled the layers
+  /// without going through `setParameters`, so where `sender.parameters` is a
+  /// local cache it still reports the layers as paused, and a conditional write
+  /// would find no change and send nothing. Only the codecs that actually have
+  /// a paused layer are forced; see [setPublishingCodecs].
+  @internal
+  Future<void> refreshSubscribedCodecs() async {
+    if (subscribedCodecs.isEmpty) {
+      return;
+    }
+    try {
+      await setPublishingCodecs(subscribedCodecs, this, force: true);
+    } catch (e) {
+      logger.warning('Failed to refresh subscribed codecs: $e');
+    }
+  }
+
+  /// Re-applies [codecs] to the senders publishing them.
+  ///
+  /// [force] asks for a write even where the sender already reports the state
+  /// being applied, for a caller re-asserting a pause the sender lost without
+  /// being told. It is narrowed per codec: one with every layer subscribed has
+  /// nothing to re-assert, so its sender is left alone.
   Future<List<String>> setPublishingCodecs(
     List<lk_rtc.SubscribedCodec> codecs,
-    LocalTrack track,
-  ) async {
+    LocalTrack track, {
+    bool force = false,
+  }) async {
     logger.fine('setPublishingCodecs $codecs');
 
     // only enable simulcast codec for preference codec setted
     if (codec == null && codecs.isNotEmpty) {
-      await updatePublishingLayers(track, codecs[0].qualities);
+      await setPublishingLayers(
+        track,
+        codecs[0].qualities,
+        isSVC: isSVCCodec(codecs[0].codec),
+        force: force && _hasPausedLayer(codecs[0]),
+      );
       return [];
     }
 
@@ -338,8 +380,9 @@ extension LocalVideoTrackExt on LocalVideoTrack {
     final List<String> newCodecs = [];
 
     for (var codec in codecs) {
+      final forceCodec = force && _hasPausedLayer(codec);
       if (this.codec?.toLowerCase() == codec.codec.toLowerCase()) {
-        await updatePublishingLayers(track, codec.qualities);
+        await setPublishingLayers(track, codec.qualities, isSVC: isSVCCodec(codec.codec), force: forceCodec);
       } else {
         final simulcastCodecInfo = simulcastCodecs[codec.codec];
         logger.fine('setPublishingCodecs $codecs');
@@ -356,6 +399,8 @@ extension LocalVideoTrackExt on LocalVideoTrack {
             simulcastCodecInfo.sender!,
             simulcastCodecInfo.encodings!,
             codec.qualities,
+            isSVC: isSVCCodec(codec.codec),
+            force: forceCodec,
           );
         }
       }
@@ -363,10 +408,13 @@ extension LocalVideoTrackExt on LocalVideoTrack {
     return newCodecs;
   }
 
-  Future<void> updatePublishingLayers(
+  @internal
+  Future<void> setPublishingLayers(
     LocalTrack? track,
-    List<lk_rtc.SubscribedQuality> layers,
-  ) async {
+    List<lk_rtc.SubscribedQuality> layers, {
+    bool isSVC = false,
+    bool force = false,
+  }) async {
     logger.fine('Update publishing layers: $layers');
 
     if (track?.sender == null) {
@@ -386,7 +434,7 @@ extension LocalVideoTrackExt on LocalVideoTrack {
       return;
     }
 
-    return setPublishingLayersForSender(track!.sender!, encodings, layers);
+    return setPublishingLayersForSender(track!.sender!, encodings, layers, isSVC: isSVC, force: force);
   }
 
   lk_models.VideoQuality _videoQualityForRid(String rid) {
@@ -405,96 +453,69 @@ extension LocalVideoTrackExt on LocalVideoTrack {
   Future<void> setPublishingLayersForSender(
     rtc.RTCRtpSender sender,
     List<rtc.RTCRtpEncoding> encodings,
-    List<lk_rtc.SubscribedQuality> layers,
-  ) async {
+    List<lk_rtc.SubscribedQuality> layers, {
+    bool isSVC = false,
+    bool force = false,
+  }) async {
     logger.fine('Update publishing layers: $layers');
 
     final params = sender.parameters;
 
-    var hasChanged = false;
+    var hasChanged = force;
 
-    /* disable closable spatial layer as it has video blur / frozen issue with current server / client
-    1. chrome 113: when switching to up layer with scalability Mode change, it will generate a
-          low resolution frame and recover very quickly, but noticable
-    2. livekit sfu: additional pli request cause video frozen for a few frames, also noticable */
-
-    /* @ts-ignore */
-    if (encodings[0].scalabilityMode != null) {
-      // svc dynacast encodings
-      final encoding = encodings[0];
-      /* @ts-ignore */
-      // const mode = new ScalabilityMode(encoding.scalabilityMode);
-      var maxQuality = lk_models.VideoQuality.OFF;
-      for (var q in layers) {
-        if (q.enabled && (maxQuality == lk_models.VideoQuality.OFF || q.quality.value > maxQuality.value)) {
-          maxQuality = q.quality;
+    // NOTE: closable spatial layer is disabled due to video blur / frozen issues
+    // with Chrome 113+ and LiveKit SFU PLI handling. See JS SDK LocalVideoTrack.ts:529-568.
+    // For SVC codecs, all layers are kept enabled and the SFU handles layer selection.
+    if (isSVC) {
+      final hasEnabledEncoding = layers.any((q) => q.enabled);
+      if (hasEnabledEncoding) {
+        for (var q in layers) {
+          q.enabled = true;
         }
       }
-
-      if (maxQuality == lk_models.VideoQuality.OFF) {
-        if (encoding.active) {
-          encoding.active = false;
-          hasChanged = true;
-        }
-      } else if (!encoding.active /* || mode.spatial !== maxQuality + 1*/) {
+    }
+    // simulcast dynacast encodings
+    var idx = 0;
+    for (var encoding in encodings) {
+      var rid = encoding.rid ?? '';
+      if (rid == '') {
+        rid = 'q';
+      }
+      final quality = _videoQualityForRid(rid);
+      final subscribedQuality = layers.firstWhereOrNull(
+        (q) => q.quality == quality,
+      );
+      if (subscribedQuality == null) {
+        continue;
+      }
+      if (encoding.active != subscribedQuality.enabled) {
         hasChanged = true;
-        encoding.active = true;
-        /*
-        var originalMode = new ScalabilityMode(senderEncodings[0].scalabilityMode)
-        mode.spatial = maxQuality + 1;
-        mode.suffix = originalMode.suffix;
-        if (mode.spatial === 1) {
-          // no suffix for L1Tx
-          mode.suffix = undefined;
-        }
-        encoding.scalabilityMode = mode.toString();
-        encoding.scaleResolutionDownBy = 2 ** (2 - maxQuality);
-      */
-      }
-    } else {
-      // simulcast dynacast encodings
-      var idx = 0;
-      for (var encoding in encodings) {
-        var rid = encoding.rid ?? '';
-        if (rid == '') {
-          rid = 'q';
-        }
-        final quality = _videoQualityForRid(rid);
-        final subscribedQuality = layers.firstWhereOrNull(
-          (q) => q.quality == quality,
+        encoding.active = subscribedQuality.enabled;
+        logger.fine(
+          'setting layer ${subscribedQuality.quality} to ${encoding.active ? 'enabled' : 'disabled'}',
         );
-        if (subscribedQuality == null) {
-          continue;
-        }
-        if (encoding.active != subscribedQuality.enabled) {
-          hasChanged = true;
-          encoding.active = subscribedQuality.enabled;
-          logger.fine(
-            'setting layer ${subscribedQuality.quality} to ${encoding.active ? 'enabled' : 'disabled'}',
-          );
 
-          // FireFox does not support setting encoding.active to false, so we
-          // have a workaround of lowering its bitrate and resolution to the min.
-          if (kIsWeb && lkBrowser() == BrowserType.firefox) {
-            if (subscribedQuality.enabled) {
-              final encodingBackup = encodingBackups[(sender.senderId, idx)] ?? encoding;
-              encoding.scaleResolutionDownBy = encodingBackup.scaleResolutionDownBy;
-              encoding.maxBitrate = encodingBackup.maxBitrate;
-              encoding.maxFramerate = encodingBackup.maxFramerate;
-            } else {
-              encodingBackups[(sender.senderId, idx)] = rtc.RTCRtpEncoding(
-                scaleResolutionDownBy: encoding.scaleResolutionDownBy,
-                maxBitrate: encoding.maxBitrate,
-                maxFramerate: encoding.maxFramerate,
-              );
-              encoding.scaleResolutionDownBy = 4;
-              encoding.maxBitrate = 10;
-              encoding.maxFramerate = 2;
-            }
+        // FireFox does not support setting encoding.active to false, so we
+        // have a workaround of lowering its bitrate and resolution to the min.
+        if (kIsWeb && lkBrowser() == BrowserType.firefox) {
+          if (subscribedQuality.enabled) {
+            final encodingBackup = encodingBackups[(sender.senderId, idx)] ?? encoding;
+            encoding.scaleResolutionDownBy = encodingBackup.scaleResolutionDownBy;
+            encoding.maxBitrate = encodingBackup.maxBitrate;
+            encoding.maxFramerate = encodingBackup.maxFramerate;
+          } else {
+            encodingBackups[(sender.senderId, idx)] = rtc.RTCRtpEncoding(
+              scaleResolutionDownBy: encoding.scaleResolutionDownBy,
+              maxBitrate: encoding.maxBitrate,
+              maxFramerate: encoding.maxFramerate,
+            );
+            encoding.scaleResolutionDownBy = 4;
+            encoding.maxBitrate = 10;
+            encoding.maxFramerate = 2;
           }
         }
-        idx++;
       }
+      idx++;
     }
 
     if (hasChanged) {
@@ -527,12 +548,44 @@ extension LocalVideoTrackExt on LocalVideoTrack {
     return simulcastCodecInfo;
   }
 
-  void setDegradationPreference(DegradationPreference preference) {
-    final params = sender?.parameters;
-    if (params == null) {
+  /// Drops all simulcast codec state tied to the current publish session.
+  ///
+  /// Must be called when the track's senders are no longer valid, on unpublish
+  /// and before republishing after a full reconnect. Otherwise later publishes
+  /// see stale senders and [addSimulcastTrack] rejects the codec as a duplicate
+  /// when the server requests the backup codec again.
+  @internal
+  void clearSimulcastState() {
+    simulcastCodecs.clear();
+    encodingBackups.clear();
+  }
+
+  Future<void> setDegradationPreference(DegradationPreference preference) async {
+    _degradationPreference = preference;
+    await applyDegradationPreference(sender);
+    for (final simulcastCodec in simulcastCodecs.values.toList()) {
+      await applyDegradationPreference(simulcastCodec.sender);
+    }
+  }
+
+  /// Applies the degradation preference resolved for this track to [sender].
+  ///
+  /// Degradation preference is a property of the sender, not of the track, so
+  /// every sender publishing this track needs it applied separately. A backup
+  /// codec publishes over its own sender, which would otherwise resolve a
+  /// preference implicitly and diverge from the primary encoder.
+  @internal
+  Future<void> applyDegradationPreference(rtc.RTCRtpSender? sender) async {
+    final preference = _degradationPreference;
+    if (sender == null || preference == null) {
       return;
     }
+    final params = sender.parameters;
     params.degradationPreference = preference.toRTCType();
-    sender?.setParameters(params);
+    try {
+      await sender.setParameters(params);
+    } catch (e) {
+      logger.warning('Failed to set degradation preference on sender $e');
+    }
   }
 }

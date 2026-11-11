@@ -18,29 +18,35 @@ include: package:lints/recommended.yaml
 analyzer:
   errors:
     constant_identifier_names: ignore
-    no_wildcard_variable_uses: ignore
     use_super_parameters: ignore
     avoid_print: ignore
-    use_build_context_synchronously: ignore
-    discarded_futures: ignore
-    prefer_final_locals: ignore
-    depend_on_referenced_packages: ignore
-
-    # Suppress noisy or harmless warnings
     deprecated_member_use_from_same_package: ignore
-    unused_element_parameter: ignore
-    unintended_html_in_doc_comment: ignore
-    implementation_imports: ignore
-    invalid_runtime_check_with_js_interop_types: ignore
-    unnecessary_import: ignore
 
-  # Exclude protobuf files
+  # Exclude generated files: protobuf, and json_serializable output. Neither is
+  # hand-edited, so lint hits there can only be fixed by changing the generator.
   exclude:
     - "**/*.pb.dart"
     - "**/*.pbenum.dart"
     - "**/*.pbjson.dart"
     - "**/*.pbserver.dart"
+    - "**/*.g.dart"
     # - 'web/*.dart'
+    # Xcode vendors Swift package checkouts under build when Swift Package
+    # Manager is enabled and this package ships Package.swift.
+    - build/**
+    - example/build/**
+    # Flutter's AnalysisOptionsMigration (flutter_tools) appends these seven
+    # patterns to this file on every `flutter analyze`/`pub get`/`run`. There is
+    # no opt-out, so they are committed here to stop the file being rewritten.
+    # Note this excludes web/, which in this package holds real Dart source (the
+    # E2EE worker) rather than just assets -- CI analyzes it explicitly with
+    # `dart analyze web/`, which does not run migrators.
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
 
 linter:
   rules:

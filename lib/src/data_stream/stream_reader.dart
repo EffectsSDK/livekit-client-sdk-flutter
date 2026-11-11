@@ -73,12 +73,21 @@ class ByteStreamReader extends BaseStreamReader<ByteStreamInfo, List<Uint8List>>
 
   StreamSubscription<DataStream_Chunk>? _streamSubscription;
   @override
-  StreamSubscription<DataStream_Chunk> listen(void Function(DataStream_Chunk event)? onData,
-      {Function? onError, void Function()? onDone, bool? cancelOnError}) {
-    _streamSubscription ??= reader!.streamController.stream.listen((DataStream_Chunk data) {
-      handleChunkReceived(data);
-      onData?.call(data);
-    }, onError: onError, onDone: onDone, cancelOnError: cancelOnError);
+  StreamSubscription<DataStream_Chunk> listen(
+    void Function(DataStream_Chunk event)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) {
+    _streamSubscription ??= reader!.streamController.stream.listen(
+      (DataStream_Chunk data) {
+        handleChunkReceived(data);
+        onData?.call(data);
+      },
+      onError: onError,
+      onDone: onDone,
+      cancelOnError: cancelOnError,
+    );
 
     return _streamSubscription!;
   }
@@ -87,11 +96,7 @@ class ByteStreamReader extends BaseStreamReader<ByteStreamInfo, List<Uint8List>>
 class TextStreamReader extends BaseStreamReader<TextStreamInfo, String> with Stream<DataStream_Chunk> {
   Map<num, DataStream_Chunk> receivedChunks = {};
 
-  TextStreamReader(
-    TextStreamInfo info,
-    DataStreamController<DataStream_Chunk> stream,
-    num? totalChunkCount,
-  ) : super(info, stream, totalChunkCount);
+  TextStreamReader(super.info, super.stream, super.totalChunkCount);
 
   @override
   void handleChunkReceived(DataStream_Chunk chunk) {
@@ -128,12 +133,21 @@ class TextStreamReader extends BaseStreamReader<TextStreamInfo, String> with Str
 
   StreamSubscription<DataStream_Chunk>? _streamSubscription;
   @override
-  StreamSubscription<DataStream_Chunk> listen(void Function(DataStream_Chunk event)? onData,
-      {Function? onError, void Function()? onDone, bool? cancelOnError}) {
-    _streamSubscription ??= reader!.streamController.stream.listen((DataStream_Chunk data) {
-      handleChunkReceived(data);
-      onData?.call(data);
-    }, onError: onError, onDone: onDone, cancelOnError: cancelOnError);
+  StreamSubscription<DataStream_Chunk> listen(
+    void Function(DataStream_Chunk event)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) {
+    _streamSubscription ??= reader!.streamController.stream.listen(
+      (DataStream_Chunk data) {
+        handleChunkReceived(data);
+        onData?.call(data);
+      },
+      onError: onError,
+      onDone: onDone,
+      cancelOnError: cancelOnError,
+    );
 
     return _streamSubscription!;
   }

@@ -20,12 +20,41 @@ class SendTextOptions {
   /// user defined attributes map that can carry additional info
   Map<String, String> attributes;
 
+  /// Whether to deflate-raw compress the payload when every recipient supports it. Defaults to
+  /// true; set false to opt out. Only honored on native platforms — web always sends uncompressed.
+  bool compress;
+
   SendTextOptions({
     this.topic,
     this.destinationIdentities = const [],
     this.attachments = const [],
     this.onProgress,
     this.attributes = const {},
+    this.compress = true,
+  });
+}
+
+/// Options for sending an in-memory byte payload with `sendBytes`.
+///
+/// Unlike a file send, nothing is inferred from the input: [name] defaults to `unknown` and the
+/// mime type to `application/octet-stream`.
+class SendBytesOptions {
+  String? topic;
+  String? name;
+  String? mimeType;
+  List<String> destinationIdentities = [];
+  Map<String, String> attributes;
+
+  /// See [SendTextOptions.compress].
+  bool compress;
+
+  SendBytesOptions({
+    this.topic,
+    this.name,
+    this.mimeType,
+    this.destinationIdentities = const [],
+    this.attributes = const {},
+    this.compress = true,
   });
 }
 
@@ -76,6 +105,13 @@ class StreamTextOptions {
     this.generated = false,
     this.attributes = const {},
   });
+
+  @override
+  String toString() =>
+      '${runtimeType}'
+      '(topic: $topic, destinationIdentities: $destinationIdentities, '
+      'streamId: $streamId, totalSize: $totalSize, type: $type, version: $version, '
+      'replyToStreamId: $replyToStreamId, attachedStreamIds: $attachedStreamIds)';
 }
 
 class StreamBytesOptions {
@@ -87,6 +123,7 @@ class StreamBytesOptions {
   String? streamId;
   int? totalSize;
   Encryption_Type? encryptionType;
+
   StreamBytesOptions({
     this.name,
     this.mimeType,
@@ -97,6 +134,12 @@ class StreamBytesOptions {
     this.totalSize,
     this.encryptionType = Encryption_Type.NONE,
   });
+
+  @override
+  String toString() =>
+      '${runtimeType}'
+      '(name: $name, mimeType: $mimeType, topic: $topic, destinationIdentities: $destinationIdentities, '
+      'attributes: $attributes, streamId: $streamId, totalSize: $totalSize, encryptionType: $encryptionType)';
 }
 
 class ChatMessage {
@@ -147,11 +190,22 @@ class DataStreamController<T extends DataStream_Chunk> {
     this.endTime,
   });
 
-  Future<void> close() => streamController.close();
+  bool get isClosed => streamController.isClosed;
 
-  void write(T chunk) => streamController.add(chunk);
+  Future<void> close() {
+    if (isClosed) return Future.value();
+    return streamController.close();
+  }
 
-  void error(DataStreamError error) => streamController.addError(error);
+  void write(T chunk) {
+    if (isClosed) return;
+    streamController.add(chunk);
+  }
+
+  void error(DataStreamError error) {
+    if (isClosed) return;
+    streamController.addError(error);
+  }
 }
 
 class ByteStreamInfo extends BaseStreamInfo {
@@ -167,15 +221,21 @@ class ByteStreamInfo extends BaseStreamInfo {
     required String sendingParticipantIdentity,
     EncryptionType encryptionType = EncryptionType.kNone,
   }) : super(
-          id: id,
-          mimeType: mimeType,
-          topic: topic,
-          timestamp: timestamp,
-          size: size,
-          attributes: attributes,
-          sendingParticipantIdentity: sendingParticipantIdentity,
-          encryptionType: encryptionType,
-        );
+         id: id,
+         mimeType: mimeType,
+         topic: topic,
+         timestamp: timestamp,
+         size: size,
+         attributes: attributes,
+         sendingParticipantIdentity: sendingParticipantIdentity,
+         encryptionType: encryptionType,
+       );
+
+  @override
+  String toString() =>
+      '${runtimeType}'
+      '(name: $name, id: $id, mimeType: $mimeType, topic: $topic, '
+      'timestamp: $timestamp, size: $size, attributes: $attributes)';
 }
 
 /// Operation types for text streams
@@ -246,15 +306,21 @@ class TextStreamInfo extends BaseStreamInfo {
     required String sendingParticipantIdentity,
     EncryptionType encryptionType = EncryptionType.kNone,
   }) : super(
-          id: id,
-          mimeType: mimeType,
-          topic: topic,
-          timestamp: timestamp,
-          size: size,
-          attributes: attributes,
-          encryptionType: encryptionType,
-          sendingParticipantIdentity: sendingParticipantIdentity,
-        );
+         id: id,
+         mimeType: mimeType,
+         topic: topic,
+         timestamp: timestamp,
+         size: size,
+         attributes: attributes,
+         encryptionType: encryptionType,
+         sendingParticipantIdentity: sendingParticipantIdentity,
+       );
+
+  @override
+  String toString() =>
+      '${runtimeType}'
+      '(id: $id, mimeType: $mimeType, topic: $topic, '
+      'timestamp: $timestamp, size: $size, attributes: $attributes)';
 }
 
 abstract class StreamWriter<T> {

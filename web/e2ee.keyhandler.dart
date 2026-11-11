@@ -56,7 +56,8 @@ class KeyProvider {
         keyOptions: keyProviderOptions,
       );
       if (sharedKey.isNotEmpty) {
-        keys.setKey(sharedKey);
+        // Should be able to set the key without waiting here.
+        unawaited(keys.setKey(sharedKey));
       }
       //keys.on(KeyHandlerEvent.KeyRatcheted, emitRatchetedKeys);
       participantKeys[participantIdentity] = keys;
@@ -73,10 +74,10 @@ class KeyProvider {
     return sharedKeyHandler!;
   }
 
-  void setSharedKey(Uint8List key, {int keyIndex = 0}) {
+  Future<void> setSharedKey(Uint8List key, {int keyIndex = 0}) async {
     logger.info('setting shared key');
     sharedKey = key;
-    getSharedKeyHandler().setKey(key, keyIndex: keyIndex);
+    await getSharedKeyHandler().setKey(key, keyIndex: keyIndex);
   }
 
   void setSifTrailer(Uint8List sifTrailer) {
@@ -185,8 +186,13 @@ class ParticipantKeyHandler {
 
   Future<void> setKey(Uint8List key, {int keyIndex = 0}) async {
     final keyMaterial = await worker.crypto.subtle
-        .importKey('raw', key.toJS, {'name': 'PBKDF2'.toJS}.jsify() as JSAny, false,
-            ['deriveBits', 'deriveKey'].jsify() as JSArray<JSString>)
+        .importKey(
+          'raw',
+          key.toJS,
+          {'name': 'PBKDF2'.toJS}.jsify() as JSAny,
+          false,
+          ['deriveBits', 'deriveKey'].jsify() as JSArray<JSString>,
+        )
         .toDart;
 
     final keySet = await deriveKeys(

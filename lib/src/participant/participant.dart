@@ -24,6 +24,7 @@ import '../managers/event.dart';
 import '../proto/livekit_models.pb.dart' as lk_models;
 import '../publication/track_publication.dart';
 import '../support/disposable.dart';
+import '../types/client_capability.dart';
 import '../types/other.dart';
 import '../types/participant_permissions.dart';
 import '../types/participant_state.dart';
@@ -97,6 +98,23 @@ abstract class Participant<T extends TrackPublication> extends DisposableChangeN
     return DateTime.timestamp();
   }
 
+  /// Client-to-client protocol version this participant supports, as advertised in
+  /// `ParticipantInfo.clientProtocol`. Drives the caller- and handler-side decision
+  /// between RPC v1 packets and RPC v2 data streams. Absent / older-client values
+  /// resolve to [ClientProtocolVersion.v0]; future values clamp to the highest
+  /// supported version.
+  ClientProtocolVersion get clientProtocol => ClientProtocolVersion.fromIntValue(_participantInfo?.clientProtocol);
+
+  /// Optional feature capabilities this participant advertises, mirrored by the server from its
+  /// `ClientInfo`. Consulted by the data-stream send path to decide per-recipient eligibility for
+  /// v2 features such as deflate-raw compression.
+  ///
+  /// The protocol's `CAP_UNUSED` placeholder and any value newer than this SDK are omitted.
+  List<ClientCapability> get capabilities => [
+    for (final value in _participantInfo?.capabilities ?? const <lk_models.ClientInfo_Capability>[])
+      ?ClientCapability.fromProto(value),
+  ];
+
   /// if [Participant] is currently speaking.
   bool get isSpeaking => _isSpeaking;
 
@@ -128,8 +146,10 @@ abstract class Participant<T extends TrackPublication> extends DisposableChangeN
     }
   }
 
-  bool get isEncrypted => [...audioTrackPublications, ...videoTrackPublications]
-      .every((track) => track.encryptionType != EncryptionType.kNone);
+  bool get isEncrypted => [
+    ...audioTrackPublications,
+    ...videoTrackPublications,
+  ].every((track) => track.encryptionType != EncryptionType.kNone);
 
   @internal
   bool get hasInfo => _participantInfo != null;
@@ -162,20 +182,24 @@ abstract class Participant<T extends TrackPublication> extends DisposableChangeN
       lastSpokeAt = DateTime.timestamp();
     }
 
-    events.emit(SpeakingChangedEvent(
-      participant: this,
-      speaking: speaking,
-    ));
+    events.emit(
+      SpeakingChangedEvent(
+        participant: this,
+        speaking: speaking,
+      ),
+    );
   }
 
   void _setMetadata(String md) {
     final changed = _participantInfo?.metadata != md;
     metadata = md;
     if (changed) {
-      [events, room.events].emit(ParticipantMetadataUpdatedEvent(
-        participant: this,
-        metadata: md,
-      ));
+      [events, room.events].emit(
+        ParticipantMetadataUpdatedEvent(
+          participant: this,
+          metadata: md,
+        ),
+      );
     }
   }
 
@@ -183,10 +207,12 @@ abstract class Participant<T extends TrackPublication> extends DisposableChangeN
     final didChange = _state != state;
     _state = state;
     if (didChange) {
-      [events, room.events].emit(ParticipantStateUpdatedEvent(
-        participant: this,
-        state: state,
-      ));
+      [events, room.events].emit(
+        ParticipantStateUpdatedEvent(
+          participant: this,
+          state: state,
+        ),
+      );
     }
   }
 
@@ -202,16 +228,19 @@ abstract class Participant<T extends TrackPublication> extends DisposableChangeN
   void updateConnectionQuality(ConnectionQuality quality) {
     if (_connectionQuality == quality) return;
     _connectionQuality = quality;
-    [events, room.events].emit(ParticipantConnectionQualityUpdatedEvent(
-      participant: this,
-      connectionQuality: _connectionQuality,
-    ));
+    [events, room.events].emit(
+      ParticipantConnectionQualityUpdatedEvent(
+        participant: this,
+        connectionQuality: _connectionQuality,
+      ),
+    );
   }
 
   @internal
   Future<bool> updateFromInfo(lk_models.ParticipantInfo info) async {
-    logger.fine('LocalParticipant.updateFromInfo(info: $info)');
+    logger.fine('${runtimeType}.updateFromInfo(info: $info)');
     if (_participantInfo != null && _participantInfo!.sid == info.sid && _participantInfo!.version > info.version) {
+      // Ignore out-of-order updates.
       return false;
     }
 
@@ -245,10 +274,12 @@ abstract class Participant<T extends TrackPublication> extends DisposableChangeN
   void updateName(String name) {
     if (_name == name) return;
     _name = name;
-    [events, room.events].emit(ParticipantNameUpdatedEvent(
-      participant: this,
-      name: name,
-    ));
+    [events, room.events].emit(
+      ParticipantNameUpdatedEvent(
+        participant: this,
+        name: name,
+      ),
+    );
   }
 
   @internal
@@ -290,11 +321,15 @@ abstract class Participant<T extends TrackPublication> extends DisposableChangeN
     final result = trackPublications.values.firstWhereOrNull((e) => e.source == source);
     if (result != null) return result;
     // try to find by compatibility
-    return trackPublications.values.where((e) => e.source == TrackSource.unknown).firstWhereOrNull((e) =>
-        (source == TrackSource.microphone && e.kind == TrackType.AUDIO) ||
-        (source == TrackSource.camera && e.kind == TrackType.VIDEO) ||
-        (source == TrackSource.screenShareVideo && e.kind == TrackType.VIDEO) ||
-        (source == TrackSource.screenShareAudio && e.kind == TrackType.AUDIO));
+    return trackPublications.values
+        .where((e) => e.source == TrackSource.unknown)
+        .firstWhereOrNull(
+          (e) =>
+              (source == TrackSource.microphone && e.kind == TrackType.AUDIO) ||
+              (source == TrackSource.camera && e.kind == TrackType.VIDEO) ||
+              (source == TrackSource.screenShareVideo && e.kind == TrackType.VIDEO) ||
+              (source == TrackSource.screenShareAudio && e.kind == TrackType.AUDIO),
+        );
   }
 
   /// Convenience property to check whether [TrackSource.camera] is published or not.

@@ -4,15 +4,14 @@ import 'dart:math' as math;
 import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter_webrtc/flutter_webrtc.dart' show AuthStatus, ColorCorrectionMode, PipelineMode;
 import 'package:livekit_client/livekit_client.dart';
 import 'package:livekit_example/exts.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../theme.dart';
 import 'room.dart';
-
-import 'package:flutter/services.dart' show rootBundle;
-import 'dart:typed_data';
 
 class JoinArgs {
   JoinArgs({
@@ -23,6 +22,7 @@ class JoinArgs {
     this.simulcast = true,
     this.adaptiveStream = true,
     this.dynacast = true,
+    this.autoSubscribe = true,
     this.preferredCodec = 'VP8',
     this.enableBackupVideoCodec = true,
   });
@@ -33,21 +33,22 @@ class JoinArgs {
   final bool simulcast;
   final bool adaptiveStream;
   final bool dynacast;
+  final bool autoSubscribe;
   final String preferredCodec;
   final bool enableBackupVideoCodec;
 }
 
 class PreJoinPage extends StatefulWidget {
-  const PreJoinPage({
-    required this.args,
-    super.key,
-  });
+  const PreJoinPage({required this.args, super.key});
   final JoinArgs args;
   @override
   State<StatefulWidget> createState() => _PreJoinPageState();
 }
 
 class _PreJoinPageState extends State<PreJoinPage> {
+  static const _prefKeyEnableVideo = 'prejoin-enable-video';
+  static const _prefKeyEnableAudio = 'prejoin-enable-audio';
+
   List<MediaDevice> _audioInputs = [];
   List<MediaDevice> _videoInputs = [];
   StreamSubscription? _subscription;
@@ -81,48 +82,79 @@ class _PreJoinPageState extends State<PreJoinPage> {
   @override
   void initState() {
     super.initState();
-    _subscription = Hardware.instance.onDeviceChange.stream.listen(_loadDevices);
-    Hardware.instance.enumerateDevices().then(_loadDevices);
+    unawaited(_initStateAsync());
+  }
+
+  Future<void> _initStateAsync() async {
+    await _readPrefs();
+    if (!mounted) return;
+    _subscription = Hardware.instance.onDeviceChange.stream.listen(
+      _loadDevices,
+    );
+    final devices = await Hardware.instance.enumerateDevices();
+    await _loadDevices(devices);
   }
 
   @override
   void deactivate() {
-    _subscription?.cancel();
+    unawaited(_subscription?.cancel());
     super.deactivate();
   }
 
-  void _loadDevices(List<MediaDevice> devices) async {
+  Future<void> _loadDevices(List<MediaDevice> devices) async {
     _audioInputs = devices.where((d) => d.kind == 'audioinput').toList();
     _videoInputs = devices.where((d) => d.kind == 'videoinput').toList();
 
-    if (_audioInputs.isNotEmpty) {
+    if (_selectedAudioDevice != null && !_audioInputs.contains(_selectedAudioDevice)) {
+      _selectedAudioDevice = null;
+    }
+    if (_audioInputs.isEmpty) {
+      await _audioTrack?.stop();
+      _audioTrack = null;
+    }
+    if (_selectedVideoDevice != null && !_videoInputs.contains(_selectedVideoDevice)) {
+      _selectedVideoDevice = null;
+    }
+    if (_videoInputs.isEmpty) {
+      await _videoTrack?.stop();
+      _videoTrack = null;
+    }
+
+    if (_enableAudio && _audioInputs.isNotEmpty) {
       if (_selectedAudioDevice == null) {
         _selectedAudioDevice = _audioInputs.first;
         Future.delayed(const Duration(milliseconds: 100), () async {
+          if (!mounted) return;
           await _changeLocalAudioTrack();
-          setState(() {});
+          if (mounted) setState(() {});
         });
       }
     }
 
-    if (_videoInputs.isNotEmpty) {
+    if (_enableVideo && _videoInputs.isNotEmpty) {
       if (_selectedVideoDevice == null) {
         _selectedVideoDevice = _videoInputs.first;
         Future.delayed(const Duration(milliseconds: 100), () async {
+          if (!mounted) return;
           await _changeLocalVideoTrack();
-          setState(() {});
+          if (mounted) setState(() {});
         });
       }
     }
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   Future<void> _setEnableVideo(value) async {
     _enableVideo = value;
+    await _writePrefs();
     if (!_enableVideo) {
       await _videoTrack?.stop();
       _videoTrack = null;
+      _selectedVideoDevice = null;
     } else {
+      if (_selectedVideoDevice == null && _videoInputs.isNotEmpty) {
+        _selectedVideoDevice = _videoInputs.first;
+      }
       await _changeLocalVideoTrack();
     }
     setState(() {});
@@ -139,7 +171,9 @@ class _PreJoinPageState extends State<PreJoinPage> {
   }
 
   Future<void> _setReplaceModeSdk(value) async {
-    setState(() { _replaceLoading = true; });
+    setState(() {
+      _replaceLoading = true;
+    });
     try {
       if (value) {
         await _videoTrack!.setPipelineMode(PipelineMode.replace);
@@ -153,14 +187,17 @@ class _PreJoinPageState extends State<PreJoinPage> {
         _replace = value;
         _blur = false;
       });
-    }
-    finally {
-      setState(() { _replaceLoading = false; });
+    } finally {
+      setState(() {
+        _replaceLoading = false;
+      });
     }
   }
 
   Future<void> _setBlurModeSdk(value) async {
-    setState(() {_blurLoading = true;});
+    setState(() {
+      _blurLoading = true;
+    });
     try {
       if (value) {
         await _videoTrack!.setPipelineMode(PipelineMode.blur);
@@ -169,17 +206,20 @@ class _PreJoinPageState extends State<PreJoinPage> {
         await _videoTrack!.setPipelineMode(PipelineMode.noEffects);
       }
       setState(() {
-        _replace = false; 
+        _replace = false;
         _blur = value;
       });
-    }
-    finally {
-      setState(() {_blurLoading = false;});
+    } finally {
+      setState(() {
+        _blurLoading = false;
+      });
     }
   }
 
   Future<void> _setColorCorrectionSdk(value) async {
-    setState(() {_colorCorrectionLoading = true;});
+    setState(() {
+      _colorCorrectionLoading = true;
+    });
     try {
       if (value) {
         await _videoTrack!.setColorCorrectionMode(ColorCorrectionMode.colorCorrectionMode);
@@ -192,14 +232,17 @@ class _PreJoinPageState extends State<PreJoinPage> {
         _lowLight = false;
         _colorCorrection = value;
       });
-    }
-    finally {
-      setState(() {_colorCorrectionLoading = false;});
+    } finally {
+      setState(() {
+        _colorCorrectionLoading = false;
+      });
     }
   }
 
   Future<void> _setLowLightSdk(value) async {
-    setState(() {_lowLightLoading = true;});
+    setState(() {
+      _lowLightLoading = true;
+    });
     try {
       if (value) {
         await _videoTrack!.setColorCorrectionMode(ColorCorrectionMode.lowLightMode);
@@ -212,63 +255,85 @@ class _PreJoinPageState extends State<PreJoinPage> {
         _lowLight = value;
         _colorCorrection = false;
       });
-    }
-    finally {
-      setState(() {_lowLightLoading = false;});
+    } finally {
+      setState(() {
+        _lowLightLoading = false;
+      });
     }
   }
 
   Future<void> _setBeautificationSdk(value) async {
-    setState(() {_beautificationLoading = true;});
+    setState(() {
+      _beautificationLoading = true;
+    });
     try {
       await _videoTrack!.enableBeautification(value);
-      setState(() {_beautification = value;});
+      setState(() {
+        _beautification = value;
+      });
       final _ = _videoTrack!.setBeautificationPower(1);
-    } 
-    finally {
-      setState(() {_beautificationLoading = false;});
+    } finally {
+      setState(() {
+        _beautificationLoading = false;
+      });
     }
   }
 
   Future<void> _setSharpeningSdk(value) async {
-    setState(() {_sharpeningLoading = true;});
+    setState(() {
+      _sharpeningLoading = true;
+    });
     try {
       await _videoTrack!.enableSharpening(value);
       final _ = _videoTrack!.setSharpeningStrength(0.8);
-      setState(() {_sharpening = value;});
-    } 
-    finally {
-      setState(() {_sharpeningLoading = false;});
+      setState(() {
+        _sharpening = value;
+      });
+    } finally {
+      setState(() {
+        _sharpeningLoading = false;
+      });
     }
   }
 
   Future<void> _setSmartZoomSdk(value) async {
-    setState(() {_smartZoomLoading = true;});
+    setState(() {
+      _smartZoomLoading = true;
+    });
     try {
       if (value) {
         await _videoTrack!.setZoomLevel(0.5);
       } else {
         await _videoTrack!.setZoomLevel(0);
       }
-      setState(() {_smartZoom = value;});
-    } 
-    finally {
-      setState(() {_smartZoomLoading = false;});
+      setState(() {
+        _smartZoom = value;
+      });
+    } finally {
+      setState(() {
+        _smartZoomLoading = false;
+      });
     }
   }
 
   Future<void> _setEnableAudio(value) async {
     _enableAudio = value;
+    await _writePrefs();
     if (!_enableAudio) {
       await _audioTrack?.stop();
       _audioTrack = null;
+      _selectedAudioDevice = null;
     } else {
+      if (_selectedAudioDevice == null && _audioInputs.isNotEmpty) {
+        _selectedAudioDevice = _audioInputs.first;
+      }
       await _changeLocalAudioTrack();
     }
     setState(() {});
   }
 
   Future<void> _changeLocalAudioTrack() async {
+    if (!_enableAudio) return;
     if (_audioTrack != null) {
       await _audioTrack!.stop();
       _audioTrack = null;
@@ -276,22 +341,20 @@ class _PreJoinPageState extends State<PreJoinPage> {
 
     if (_selectedAudioDevice != null) {
       _audioTrack = await LocalAudioTrack.create(
-        AudioCaptureOptions(
-          deviceId: _selectedAudioDevice!.deviceId,
-        ),
+        AudioCaptureOptions(deviceId: _selectedAudioDevice!.deviceId),
       );
       await _audioTrack!.start();
     }
   }
 
   Future<void> _changeLocalVideoTrack() async {
+    if (!_enableVideo) return;
     if (_videoTrack != null) {
       await _videoTrack!.stop();
       _videoTrack = null;
     }
 
     if (_selectedVideoDevice != null) {
-
       VideoEffectsSDKExt.initialize('CUSTOMER_ID');
 
       _videoTrack = await LocalVideoTrack.createCameraTrack(CameraCaptureOptions(
@@ -301,14 +364,14 @@ class _PreJoinPageState extends State<PreJoinPage> {
         effectsSdkRequired: true,
       ));
       await _videoTrack!.start();
-      Future<void>.delayed(Duration.zero, (){ _setupVideoEffects(); });
+      unawaited(_setupVideoEffects());
     }
   }
 
   Future<void> _setupVideoEffects() async {
     if (!kIsWeb) {
-      AuthStatus status = await _videoTrack!.auth('YOUR_CUSTOMER_KEY');
-      switch (status){
+      final status = await _videoTrack!.auth('YOUR_CUSTOMER_KEY');
+      switch (status) {
         case AuthStatus.active:
           break;
         case AuthStatus.expired:
@@ -337,13 +400,13 @@ class _PreJoinPageState extends State<PreJoinPage> {
 
     if (_isFirstSetup) {
       _isFirstSetup = false;
-      _setBlurModeSdk(true);
+      await _setBlurModeSdk(true);
     }
   }
 
   @override
   void dispose() {
-    _subscription?.cancel();
+    unawaited(_subscription?.cancel());
     super.dispose();
   }
 
@@ -352,16 +415,16 @@ class _PreJoinPageState extends State<PreJoinPage> {
 
     setState(() {});
 
-    var args = widget.args;
+    final args = widget.args;
 
     try {
       //create new room
-      var cameraEncoding = const VideoEncoding(
+      const cameraEncoding = VideoEncoding(
         maxBitrate: 5 * 1000 * 1000,
         maxFramerate: 30,
       );
 
-      var screenEncoding = const VideoEncoding(
+      const screenEncoding = VideoEncoding(
         maxBitrate: 3 * 1000 * 1000,
         maxFramerate: 15,
       );
@@ -381,15 +444,15 @@ class _PreJoinPageState extends State<PreJoinPage> {
             name: 'custom_audio_track_name',
           ),
           defaultCameraCaptureOptions: const CameraCaptureOptions(
-              maxFrameRate: 30,
-              params: VideoParameters(
-                dimensions: VideoDimensions(1280, 720),
-              )),
+            maxFrameRate: 30,
+            params: VideoParameters(dimensions: VideoDimensions(1280, 720)),
+          ),
           defaultScreenShareCaptureOptions: const ScreenShareCaptureOptions(
-              useiOSBroadcastExtension: true,
-              params: VideoParameters(
-                dimensions: VideoDimensionsPresets.h1080_169,
-              )),
+            useiOSBroadcastExtension: true,
+            params: VideoParameters(
+              dimensions: VideoDimensionsPresets.h1080_169,
+            ),
+          ),
           defaultVideoPublishOptions: VideoPublishOptions(
             simulcast: args.simulcast,
             videoCodec: args.preferredCodec,
@@ -412,18 +475,23 @@ class _PreJoinPageState extends State<PreJoinPage> {
       await room.connect(
         args.url,
         args.token,
+        connectOptions: ConnectOptions(autoSubscribe: args.autoSubscribe),
         fastConnectOptions: FastConnectOptions(
           microphone: TrackOption(track: _audioTrack),
           camera: TrackOption(track: _videoTrack),
         ),
       );
 
+      if (!context.mounted) return;
       await Navigator.push<void>(
         context,
-        MaterialPageRoute(builder: (_) => RoomPage(room, listener)),
+        MaterialPageRoute(
+          builder: (_) => RoomPage(room, listener, fastConnection: true),
+        ),
       );
     } catch (error) {
       print('Could not connect $error');
+      if (!context.mounted) return;
       await context.showErrorDialog(error);
     } finally {
       setState(() {
@@ -435,14 +503,12 @@ class _PreJoinPageState extends State<PreJoinPage> {
   void _actionBack(BuildContext context) async {
     await _setEnableVideo(false);
     await _setEnableAudio(false);
+    if (!context.mounted) return;
     Navigator.of(context).pop();
   }
 
-  Widget sdkSwitcher({
-    required String title, 
-    required bool value, 
-    required void Function(bool) onChanged,
-    bool loading = false}) {
+  Widget sdkSwitcher(
+      {required String title, required bool value, required void Function(bool) onChanged, bool loading = false}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 5),
       child: Row(
@@ -450,7 +516,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
         children: [
           Text(title),
           const Spacer(),
-          if (loading) const CircularProgressIndicator(padding:EdgeInsets.only(right: 6)),
+          if (loading) const CircularProgressIndicator(padding: EdgeInsets.only(right: 6)),
           Switch(
             value: value,
             onChanged: onChanged,
@@ -460,55 +526,74 @@ class _PreJoinPageState extends State<PreJoinPage> {
     );
   }
 
+  Future<void> _readPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _enableVideo = prefs.getBool(_prefKeyEnableVideo) ?? true;
+      _enableAudio = prefs.getBool(_prefKeyEnableAudio) ?? true;
+    });
+  }
+
+  Future<void> _writePrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefKeyEnableVideo, _enableVideo);
+    await prefs.setBool(_prefKeyEnableAudio, _enableAudio);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(
-          title: const Text(
-            'Select Devices',
-            style: TextStyle(
-              color: Colors.white,
-            ),
-          ),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => _actionBack(context),
-          ),
+      appBar: AppBar(
+        title: const Text(
+          'Select Devices',
+          style: TextStyle(color: Colors.white),
         ),
-        body: Container(
-            alignment: Alignment.center,
-            child: SingleChildScrollView(
-                child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 20,
-              ),
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => _actionBack(context),
+        ),
+      ),
+      body: Container(
+        alignment: Alignment.center,
+        child: SingleChildScrollView(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                 Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: SizedBox(
-                        width: 320,
-                        height: 240,
-                        child: Container(
-                          alignment: Alignment.center,
-                          color: Colors.black54,
-                          child: _videoTrack != null
-                              ? VideoTrackRenderer(
-                                  renderMode: VideoRenderMode.auto,
-                                  _videoTrack!,
-                                )
-                              : Container(
-                                  alignment: Alignment.center,
-                                  child: LayoutBuilder(
-                                    builder: (ctx, constraints) => Icon(
-                                      Icons.videocam_off,
-                                      color: LKColors.lkBlue,
-                                      size: math.min(constraints.maxHeight, constraints.maxWidth) * 0.3,
-                                    ),
-                                  ),
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: SizedBox(
+                    width: 320,
+                    height: 240,
+                    child: Container(
+                      alignment: Alignment.center,
+                      color: Colors.black54,
+                      child: _videoTrack != null
+                          ? VideoTrackRenderer(
+                              renderMode: VideoRenderMode.auto,
+                              _videoTrack!,
+                            )
+                          : Container(
+                              alignment: Alignment.center,
+                              child: LayoutBuilder(
+                                builder: (ctx, constraints) => Icon(
+                                  Icons.videocam_off,
+                                  color: LKColors.lkBlue,
+                                  size: math.min(
+                                        constraints.maxHeight,
+                                        constraints.maxWidth,
+                                      ) *
+                                      0.3,
                                 ),
-                        ))),
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 5),
                   child: Row(
@@ -528,20 +613,18 @@ class _PreJoinPageState extends State<PreJoinPage> {
                     child: DropdownButton2<MediaDevice>(
                       isExpanded: true,
                       disabledHint: const Text('Disable Camera'),
-                      hint: const Text(
-                        'Select Camera',
-                      ),
+                      hint: const Text('Select Camera'),
                       items: _enableVideo
                           ? _videoInputs
-                              .map((MediaDevice item) => DropdownMenuItem<MediaDevice>(
-                                    value: item,
-                                    child: Text(
-                                      item.label,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ))
+                              .map(
+                                (MediaDevice item) => DropdownMenuItem<MediaDevice>(
+                                  value: item,
+                                  child: Text(
+                                    item.label,
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                ),
+                              )
                               .toList()
                           : [],
                       value: _selectedVideoDevice,
@@ -557,9 +640,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
                         height: 40,
                         width: 140,
                       ),
-                      menuItemStyleData: const MenuItemStyleData(
-                        height: 40,
-                      ),
+                      menuItemStyleData: const MenuItemStyleData(height: 40),
                     ),
                   ),
                 ),
@@ -569,24 +650,25 @@ class _PreJoinPageState extends State<PreJoinPage> {
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton2<VideoParameters>(
                         isExpanded: true,
-                        hint: const Text(
-                          'Select Video Dimensions',
-                        ),
+                        hint: const Text('Select Video Dimensions'),
                         items: [
                           VideoParametersPresets.h480_43,
                           VideoParametersPresets.h540_169,
                           VideoParametersPresets.h720_169,
                           VideoParametersPresets.h1080_169,
                         ]
-                            .map((VideoParameters item) => DropdownMenuItem<VideoParameters>(
-                                  value: item,
-                                  child: Text(
-                                    '${item.dimensions.width}x${item.dimensions.height}',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ))
+                            .map(
+                              (
+                                VideoParameters item,
+                              ) =>
+                                  DropdownMenuItem<VideoParameters>(
+                                value: item,
+                                child: Text(
+                                  '${item.dimensions.width}x${item.dimensions.height}',
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                              ),
+                            )
                             .toList(),
                         value: _selectedVideoParameters,
                         onChanged: (VideoParameters? value) async {
@@ -601,9 +683,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
                           height: 40,
                           width: 140,
                         ),
-                        menuItemStyleData: const MenuItemStyleData(
-                          height: 40,
-                        ),
+                        menuItemStyleData: const MenuItemStyleData(height: 40),
                       ),
                     ),
                   ),
@@ -621,53 +701,36 @@ class _PreJoinPageState extends State<PreJoinPage> {
                   ),
                 ),
                 sdkSwitcher(
-                  title: 'Replace:',
-                  value: _replace,
-                  onChanged: _setReplaceModeSdk,
-                  loading: _replaceLoading
-                ),
+                    title: 'Replace:', value: _replace, onChanged: _setReplaceModeSdk, loading: _replaceLoading),
+                sdkSwitcher(title: 'Blur:', value: _blur, onChanged: _setBlurModeSdk, loading: _blurLoading),
                 sdkSwitcher(
-                  title: 'Blur:',
-                  value: _blur,
-                  onChanged: _setBlurModeSdk,
-                  loading: _blurLoading
-                ),
+                    title: 'Smart Zoom:', value: _smartZoom, onChanged: _setSmartZoomSdk, loading: _smartZoomLoading),
                 sdkSwitcher(
-                  title: 'Smart Zoom:',
-                  value: _smartZoom,
-                  onChanged: _setSmartZoomSdk,
-                  loading: _smartZoomLoading
-                ),
+                    title: 'Color Correction:',
+                    value: _colorCorrection,
+                    onChanged: _setColorCorrectionSdk,
+                    loading: _colorCorrectionLoading),
                 sdkSwitcher(
-                  title: 'Color Correction:',
-                  value: _colorCorrection,
-                  onChanged: _setColorCorrectionSdk,
-                  loading: _colorCorrectionLoading
-                ),
+                    title: 'Low Light Adjustment:',
+                    value: _lowLight,
+                    onChanged: _setLowLightSdk,
+                    loading: _lowLightLoading),
                 sdkSwitcher(
-                  title: 'Low Light Adjustment:',
-                  value: _lowLight,
-                  onChanged: _setLowLightSdk,
-                  loading: _lowLightLoading
-                ),
+                    title: 'Beautification:',
+                    value: _beautification,
+                    onChanged: _setBeautificationSdk,
+                    loading: _beautificationLoading),
                 sdkSwitcher(
-                  title: 'Beautification:',
-                  value: _beautification,
-                  onChanged: _setBeautificationSdk,
-                  loading: _beautificationLoading
-                ),
-                sdkSwitcher(
-                  title: 'Sharpening:',
-                  value: _sharpening,
-                  onChanged: _setSharpeningSdk,
-                  loading: _sharpeningLoading
-                ),
+                    title: 'Sharpening:',
+                    value: _sharpening,
+                    onChanged: _setSharpeningSdk,
+                    loading: _sharpeningLoading),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 5),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Micriphone:'),
+                      const Text('Microphone:'),
                       Switch(
                         value: _enableAudio,
                         onChanged: (value) => _setEnableAudio(value),
@@ -681,20 +744,18 @@ class _PreJoinPageState extends State<PreJoinPage> {
                     child: DropdownButton2<MediaDevice>(
                       isExpanded: true,
                       disabledHint: const Text('Disable Microphone'),
-                      hint: const Text(
-                        'Select Micriphone',
-                      ),
+                      hint: const Text('Select Microphone'),
                       items: _enableAudio
                           ? _audioInputs
-                              .map((MediaDevice item) => DropdownMenuItem<MediaDevice>(
-                                    value: item,
-                                    child: Text(
-                                      item.label,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ))
+                              .map(
+                                (MediaDevice item) => DropdownMenuItem<MediaDevice>(
+                                  value: item,
+                                  child: Text(
+                                    item.label,
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                ),
+                              )
                               .toList()
                           : [],
                       value: _selectedAudioDevice,
@@ -710,9 +771,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
                         height: 40,
                         width: 140,
                       ),
-                      menuItemStyleData: const MenuItemStyleData(
-                        height: 40,
-                      ),
+                      menuItemStyleData: const MenuItemStyleData(height: 40),
                     ),
                   ),
                 ),
@@ -733,11 +792,15 @@ class _PreJoinPageState extends State<PreJoinPage> {
                             ),
                           ),
                         ),
-                      const Text('JOIN'),
+                      const Text('Join'),
                     ],
                   ),
                 ),
-              ]),
-            ))));
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

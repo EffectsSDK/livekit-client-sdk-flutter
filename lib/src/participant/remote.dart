@@ -55,18 +55,17 @@ class ParticipantCreationResult {
 
 /// Represents other participant in the [Room].
 class RemoteParticipant extends Participant<RemoteTrackPublication> {
-  @internal
-  RemoteParticipant({
+  RemoteParticipant._({
     required Room room,
     required String sid,
     required String identity,
     required String name,
   }) : super(
-          room: room,
-          sid: sid,
-          identity: identity,
-          name: name,
-        );
+         room: room,
+         sid: sid,
+         identity: identity,
+         name: name,
+       );
 
   /// Creates a fully initialized RemoteParticipant without emitting events.
   ///
@@ -84,7 +83,7 @@ class RemoteParticipant extends Participant<RemoteTrackPublication> {
     required Room room,
     required lk_models.ParticipantInfo info,
   }) async {
-    final participant = RemoteParticipant(
+    final participant = RemoteParticipant._(
       room: room,
       sid: info.sid,
       identity: info.identity,
@@ -238,7 +237,7 @@ class RemoteParticipant extends Participant<RemoteTrackPublication> {
     /// Apply audio output selection for the web.
     if (pub.kind == TrackType.AUDIO && lkPlatformIs(PlatformType.web)) {
       if (audioOutputOptions.deviceId != null) {
-        await (track as RemoteAudioTrack).setSinkId(audioOutputOptions.deviceId!);
+        (track as RemoteAudioTrack).setSinkId(audioOutputOptions.deviceId!);
       }
     }
 
@@ -246,11 +245,13 @@ class RemoteParticipant extends Participant<RemoteTrackPublication> {
     await pub.updateSubscriptionAllowed(true);
     addTrackPublication(pub);
 
-    [events, room.events].emit(TrackSubscribedEvent(
-      participant: this,
-      track: track,
-      publication: pub,
-    ));
+    [events, room.events].emit(
+      TrackSubscribedEvent(
+        participant: this,
+        track: track,
+        publication: pub,
+      ),
+    );
 
     await track.start();
   }
@@ -260,7 +261,7 @@ class RemoteParticipant extends Participant<RemoteTrackPublication> {
   Future<bool> updateFromInfo(lk_models.ParticipantInfo info) async {
     logger.fine('RemoteParticipant.updateFromInfo(info: $info)');
     if (!await super.updateFromInfo(info)) {
-      //return false;
+      return false;
     }
 
     await _updateTracks(info.tracks);
@@ -298,24 +299,26 @@ class RemoteParticipant extends Participant<RemoteTrackPublication> {
       logger.warning('Publication not found $trackSid');
       return;
     }
-    await pub.dispose();
-
     final track = pub.track;
     // if has track
     if (track != null) {
       await track.stop();
-      [events, room.events].emit(TrackUnsubscribedEvent(
-        participant: this,
-        track: track,
-        publication: pub,
-      ));
+      [events, room.events].emit(
+        TrackUnsubscribedEvent(
+          participant: this,
+          track: track,
+          publication: pub,
+        ),
+      );
     }
 
     if (notify) {
-      [events, room.events].emit(TrackUnpublishedEvent(
-        participant: this,
-        publication: pub,
-      ));
+      [events, room.events].emit(
+        TrackUnpublishedEvent(
+          participant: this,
+          publication: pub,
+        ),
+      );
     }
 
     await pub.dispose();
@@ -330,7 +333,7 @@ class RemoteParticipant extends Participant<RemoteTrackPublication> {
 
   @internal
   lk_models.ParticipantTracks participantTracks() => lk_models.ParticipantTracks(
-        participantSid: sid,
-        trackSids: trackPublications.values.map((e) => e.sid),
-      );
+    participantSid: sid,
+    trackSids: trackPublications.values.map((e) => e.sid),
+  );
 }

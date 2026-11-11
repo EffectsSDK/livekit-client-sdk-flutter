@@ -8,22 +8,51 @@ import '../proto/livekit_models.pb.dart' as lk_models;
 import '../types/data_stream.dart';
 import '../types/other.dart';
 import '../utils.dart';
+import 'errors.dart';
 
 class BaseStreamWriter<T, InfoType extends BaseStreamInfo> {
   final StreamWriter<T> writableStream;
-  Function()? onClose;
+  Future<void> Function()? onClose;
 
   final InfoType info;
 
   BaseStreamWriter({required this.writableStream, required this.info, this.onClose});
 
+  Future<void>? _closing;
+  int _writesInFlight = 0;
+  Completer<void>? _writesDone;
+
+  /// Writes [chunk] to the stream. Fails with [DataStreamErrorReason.AlreadyClosed] once [close]
+  /// has been called.
   Future<void> write(T chunk) async {
-    return writableStream.write(chunk);
+    if (_closing != null) {
+      throw DataStreamError(reason: DataStreamErrorReason.AlreadyClosed, message: 'Stream writer is closed');
+    }
+    _writesInFlight++;
+    try {
+      await writableStream.write(chunk);
+    } finally {
+      _writesInFlight--;
+      if (_writesInFlight == 0) {
+        _writesDone?.complete();
+        _writesDone = null;
+      }
+    }
   }
 
-  Future<void> close() async {
-    await writableStream.close();
-    onClose?.call();
+  /// Ends the stream once the writes already issued have finished. Closing again does nothing
+  /// more and completes with the first close.
+  Future<void> close() => _closing ??= _close();
+
+  Future<void> _close() async {
+    // The stream ends after its last chunk, and the native writer is only released once nothing
+    // is still using it.
+    if (_writesInFlight > 0) await (_writesDone = Completer<void>()).future;
+    try {
+      await writableStream.close();
+    } finally {
+      await onClose?.call();
+    }
   }
 }
 
@@ -57,10 +86,11 @@ class WritableStream<T> implements StreamWriter<T> {
       streamId: streamId,
     );
     final trailerPacket = lk_models.DataPacket(
+      kind: lk_models.DataPacket_Kind.RELIABLE,
       destinationIdentities: destinationIdentities,
       streamTrailer: trailer,
     );
-    await engine.sendDataPacket(trailerPacket, reliability: true);
+    await engine.sendDataPacket(trailerPacket, reliability: Reliability.reliable);
   }
 
   @override
@@ -73,10 +103,11 @@ class WritableStream<T> implements StreamWriter<T> {
         chunkIndex: Int64(chunkId),
       );
       final chunkPacket = lk_models.DataPacket(
+        kind: lk_models.DataPacket_Kind.RELIABLE,
         destinationIdentities: destinationIdentities,
         streamChunk: chunk,
       );
-      await engine.sendDataPacket(chunkPacket, reliability: true);
+      await engine.sendDataPacket(chunkPacket, reliability: Reliability.reliable);
       chunkId += 1;
     }
   }
