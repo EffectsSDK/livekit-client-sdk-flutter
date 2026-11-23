@@ -292,11 +292,11 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: 8cd3fea7e7930aaf88c6ba30ca3c78a7112fb874
-      resolved-ref: 8cd3fea7e7930aaf88c6ba30ca3c78a7112fb874
-      url: "git@git.tomsksoft.com:tomsksoft/virtual-background-sdk/flutter-webrtc-patch.git"
+      ref: 57cb343dfbe17a58252c128d0b83468cc63ad058
+      resolved-ref: 57cb343dfbe17a58252c128d0b83468cc63ad058
+      url: "https://github.com/EffectsSDK/flutter-webrtc.git"
     source: git
-    version: "1.2.0"
+    version: "1.6.3"
   glob:
     dependency: transitive
     description:

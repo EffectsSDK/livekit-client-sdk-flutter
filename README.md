@@ -27,7 +27,7 @@ dependencies:
 
 For the web, add the next line to your index.html.
 ```html
-<script src="https://effectssdk.ai/sdk/web/3.5.7/tsvb-web.js"></script>
+<script src="https://effectssdk.ai/sdk/web/3.14.0/tsvb-web.js"></script>
 ```
 Call [VideoEffectsSDKExt.initialize](https://effectssdk.ai/sdk/livekit-flutter/livekit_client/VideoEffectsSDKExt/initialize.html) method before the first `LocalVideoTrack.createCameraTrack` call.
 ```dart

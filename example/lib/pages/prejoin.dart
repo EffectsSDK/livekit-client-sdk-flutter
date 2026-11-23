@@ -71,6 +71,10 @@ class _PreJoinPageState extends State<PreJoinPage> {
   bool _beautificationLoading = false;
   bool _sharpening = false;
   bool _sharpeningLoading = false;
+  bool _noiseSuppression = false;
+  bool _noiseSuppressionLoading = false;
+  bool _portraitLighting = false;
+  bool _portraitLightingLoading = false;
   bool _enableAudio = true;
   LocalAudioTrack? _audioTrack;
   LocalVideoTrack? _videoTrack;
@@ -296,6 +300,32 @@ class _PreJoinPageState extends State<PreJoinPage> {
     }
   }
 
+  Future<void> _setNoiseSuppressionSdk(bool value) async {
+    final track = _videoTrack;
+    if (!mounted || track == null) return;
+
+    setState(() => _noiseSuppressionLoading = true);
+    try {
+      await track.enableNoiseSuppression(value);
+      if (mounted && _videoTrack == track) setState(() => _noiseSuppression = value);
+    } finally {
+      if (mounted) setState(() => _noiseSuppressionLoading = false);
+    }
+  }
+
+  Future<void> _setPortraitLightingSdk(bool value) async {
+    final track = _videoTrack;
+    if (!mounted || track == null) return;
+
+    setState(() => _portraitLightingLoading = true);
+    try {
+      await track.enablePortraitLighting(value);
+      if (mounted && _videoTrack == track) setState(() => _portraitLighting = value);
+    } finally {
+      if (mounted) setState(() => _portraitLightingLoading = false);
+    }
+  }
+
   Future<void> _setSmartZoomSdk(value) async {
     setState(() {
       _smartZoomLoading = true;
@@ -397,6 +427,8 @@ class _PreJoinPageState extends State<PreJoinPage> {
     if (_smartZoom) await _setSmartZoomSdk(_smartZoom);
     if (_beautification) await _setBeautificationSdk(_beautification);
     if (_sharpening) await _setSharpeningSdk(_sharpening);
+    if (_noiseSuppression) await _setNoiseSuppressionSdk(_noiseSuppression);
+    if (_portraitLighting) await _setPortraitLightingSdk(_portraitLighting);
 
     if (_isFirstSetup) {
       _isFirstSetup = false;
@@ -508,7 +540,7 @@ class _PreJoinPageState extends State<PreJoinPage> {
   }
 
   Widget sdkSwitcher(
-      {required String title, required bool value, required void Function(bool) onChanged, bool loading = false}) {
+      {required String title, required bool value, required ValueChanged<bool>? onChanged, bool loading = false}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 5),
       child: Row(
@@ -725,6 +757,22 @@ class _PreJoinPageState extends State<PreJoinPage> {
                     value: _sharpening,
                     onChanged: _setSharpeningSdk,
                     loading: _sharpeningLoading),
+                if (kIsWeb ||
+                    defaultTargetPlatform == TargetPlatform.android ||
+                    defaultTargetPlatform == TargetPlatform.iOS) ...[
+                  sdkSwitcher(
+                    title: 'Noise Suppression:',
+                    value: _noiseSuppression,
+                    onChanged: _videoTrack == null || _noiseSuppressionLoading ? null : _setNoiseSuppressionSdk,
+                    loading: _noiseSuppressionLoading,
+                  ),
+                  sdkSwitcher(
+                    title: 'Portrait Lighting:',
+                    value: _portraitLighting,
+                    onChanged: _videoTrack == null || _portraitLightingLoading ? null : _setPortraitLightingSdk,
+                    loading: _portraitLightingLoading,
+                  ),
+                ],
                 Padding(
                   padding: const EdgeInsets.only(bottom: 5),
                   child: Row(

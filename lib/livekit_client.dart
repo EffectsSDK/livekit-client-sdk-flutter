@@ -14,7 +14,7 @@
 
 import 'src/types/rpc.dart' show kRpcVersion;
 
-export 'package:flutter_webrtc/flutter_webrtc.dart' show EffectsSdkImage;
+export 'package:flutter_webrtc/flutter_webrtc.dart' show ColorCorrectionConfig, EffectsSdkImage, PortraitLightingOptions;
 
 export 'src/connection_check/checks/checker.dart';
 export 'src/connection_check/checks/cloud_region.dart' show RegionStats;

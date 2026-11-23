@@ -56,8 +56,8 @@ dependencies:
   # Fix version to avoid version conflicts between WebRTC-SDK pods, which both this package and flutter_webrtc depend on.
   flutter_webrtc:
     git:
-      url: git@git.tomsksoft.com:tomsksoft/virtual-background-sdk/flutter-webrtc-patch.git
-      ref: 8cd3fea7e7930aaf88c6ba30ca3c78a7112fb874
+      url: https://github.com/EffectsSDK/flutter-webrtc.git
+      ref: 57cb343dfbe17a58252c128d0b83468cc63ad058
   dart_webrtc: ^1.8.0
 
   # Rust core (livekit-ffi), delivered as a bundled cdylib via Native Assets.
