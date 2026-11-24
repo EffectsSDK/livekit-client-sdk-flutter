@@ -97,4 +97,4 @@ Also you can replace CameraPipeline to lite version of it.
 3. Original livekit API documentation [site](https://docs.livekit.io/reference/client-sdk-flutter/)
 
 
-For LiveKit setup and platform requirements, see the [upstream README](https://github.com/livekit/client-sdk-flutter/blob/f38055a16b45e58bb53cb29a3a4501f43538e7c8/README.md) and the [audio session guide](doc/audio.md).
+For LiveKit setup and platform requirements, see the [upstream README](https://github.com/livekit/client-sdk-flutter/blob/76bf736b8a5fd1919999ab245581e5423eb4c8f1/README.md) and the [audio session guide](doc/audio.md).

@@ -3,7 +3,7 @@ import 'dart:math' as math;
 
 import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart'; // ignore: deprecated_member_use
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_webrtc/flutter_webrtc.dart' show AuthStatus, ColorCorrectionMode, PipelineMode;
 import 'package:livekit_client/livekit_client.dart';
