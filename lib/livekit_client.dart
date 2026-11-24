@@ -62,7 +62,7 @@ export 'src/support/platform.dart';
 export 'src/audio/audio_processing_state.dart';
 export 'src/track/audio_visualizer.dart';
 export 'src/track/local/audio.dart' hide resolveCaptureProcessingOptions;
-export 'src/track/local/effects_sdk.dart';
+export 'src/track/local/effects_sdk.dart' show VideoEffectsSDKExt;
 export 'src/track/local/local.dart';
 export 'src/track/local/video.dart';
 export 'src/track/options.dart';

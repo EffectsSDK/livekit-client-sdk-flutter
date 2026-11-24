@@ -40,6 +40,7 @@ import '../remote/video.dart';
 import '../track.dart';
 import '../video_track_view_registration.dart';
 import 'audio.dart';
+import 'effects_sdk.dart';
 import 'video.dart';
 
 /// Used to group [LocalVideoTrack] and [RemoteVideoTrack].
@@ -346,6 +347,16 @@ abstract class LocalTrack extends Track {
 
     // set new stream & track to this object
     updateMediaStreamAndTrack(newStream, newTrack);
+
+    final video = this;
+    if (video is LocalVideoTrack && video.currentOptions.effectsSdkRequired == true) {
+      try {
+        await restoreVideoEffects(video, newTrack);
+      } catch (_) {
+        await _disposeMediaTrack(true);
+        rethrow;
+      }
+    }
 
     // Restart the processor on the new track before the sender gets it, so
     // the sender carries the processed track when the processor has one.

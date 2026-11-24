@@ -142,6 +142,56 @@ void main() {
     return (track, processor, sender);
   }
 
+  test('restartTrack restores successful camera effects before publishing the replacement', () async {
+    final calls = <MethodCall>[];
+    final sender = _FakeSender();
+    messenger.setMockMethodCallHandler(webrtcChannel, (call) async {
+      if (call.method == 'getUserMedia') {
+        trackCounter++;
+        return {
+          'streamId': 'stream-$trackCounter',
+          'audioTracks': <dynamic>[],
+          'videoTracks': [
+            {'id': 'cam-$trackCounter', 'label': 'camera', 'kind': 'video', 'enabled': true},
+          ],
+        };
+      }
+      if (call.method == 'auth') {
+        calls.add(call);
+        return 'ACTIVE';
+      }
+      if (['setBlurPower', 'enableBeautification', 'setPortraitLightingOptions'].contains(call.method)) {
+        if (call.arguments['blurPower'] == 0.9) throw PlatformException(code: 'failed');
+        expect(sender.replacedTrackIds, isEmpty);
+        calls.add(call);
+      }
+      return null;
+    });
+    final track = await LocalVideoTrack.createCameraTrack(const CameraCaptureOptions(effectsSdkRequired: true));
+    await track.start();
+    track.transceiver = _FakeTransceiver(sender);
+    await track.auth('customer');
+    await track.setBlurPower(0.4);
+    await track.setBlurPower(0);
+    await expectLater(track.setBlurPower(0.9), throwsA(anything));
+    await track.enableBeautification(false);
+    await track.setPortraitLightingOptions(const PortraitLightingOptions(lightStrength: 0.2));
+    await track.setPortraitLightingOptions(const PortraitLightingOptions(backgroundDarkness: 0.5));
+    calls.clear();
+
+    await track.restartTrack();
+
+    expect(calls.first.method, 'auth');
+    expect(calls.map((call) => call.arguments['trackId']), everyElement('cam-2'));
+    final restored = {for (final call in calls) call.method: call.arguments};
+    expect(calls, hasLength(4));
+    expect(restored['setBlurPower']['blurPower'], 0);
+    expect(restored['enableBeautification']['enable'], false);
+    expect(restored['setPortraitLightingOptions']['options'], {'lightStrength': 0.2, 'backgroundDarkness': 0.5});
+    expect(sender.replacedTrackIds, ['cam-2']);
+    await track.dispose();
+  });
+
   test('mute and unmute restart the processor on the new track', () async {
     final (track, processor, sender) = await createPublishedTrack();
     expect(processor.initTrackIds, ['mic-1']);
